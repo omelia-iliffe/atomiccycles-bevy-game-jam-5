@@ -20,7 +20,7 @@ pub(super) fn plugin(app: &mut App) {
 
 fn enter_playing(mut commands: Commands) {
     commands.trigger(SpawnLevel);
-    commands.trigger(PlaySoundtrack::Key(SoundtrackKey::Gameplay));
+    // commands.trigger(PlaySoundtrack::Key(SoundtrackKey::Gameplay));
 }
 
 fn exit_playing(mut commands: Commands) {

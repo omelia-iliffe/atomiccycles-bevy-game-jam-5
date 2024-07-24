@@ -824,15 +824,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c115c97a5c8a263bd0aa7001b999772c744ac5ba797d07c86f25734ce381ea69"
 
 [[package]]
-name = "bevy_quickstart"
-version = "0.1.0"
-dependencies = [
- "bevy",
- "log",
- "rand",
-]
-
-[[package]]
 name = "bevy_reflect"
 version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1008,15 +999,6 @@ dependencies = [
  "concurrent-queue",
  "futures-lite",
  "wasm-bindgen-futures",
-]
-
-[[package]]
-name = "lifecycles"
-version = "0.1.0"
-dependencies = [
- "bevy",
- "log",
- "rand",
 ]
 
 [[package]]
@@ -2396,6 +2378,15 @@ checksum = "3c8469b4a23b962c1396b9b451dda50ef5b283e8dd309d69033475fa9b334324"
 dependencies = [
  "libc",
  "pkg-config",
+]
+
+[[package]]
+name = "lifecycles"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+ "log",
+ "rand",
 ]
 
 [[package]]

@@ -3,9 +3,9 @@
 //! If you want to move the player in a smoother way,
 //! consider using a [fixed timestep](https://github.com/bevyengine/bevy/blob/main/examples/movement/physics_in_fixed_timestep.rs).
 
-use bevy::{prelude::*, window::PrimaryWindow};
+use bevy::prelude::*;
 
-use crate::AppSet;
+use crate::{game::cycles::AddCycle, AppSet};
 
 pub(super) fn plugin(app: &mut App) {
     // Record directional input as movement controls.
@@ -16,10 +16,9 @@ pub(super) fn plugin(app: &mut App) {
     );
 
     // Apply movement based on controls.
-    app.register_type::<(Movement, WrapWithinWindow)>();
     app.add_systems(
         Update,
-        (apply_movement, wrap_within_window)
+        (apply_movement, apply_revolve)
             .chain()
             .in_set(AppSet::Update),
     );
@@ -27,70 +26,120 @@ pub(super) fn plugin(app: &mut App) {
 
 #[derive(Component, Reflect, Default)]
 #[reflect(Component)]
-pub struct MovementController(pub Vec2);
+pub struct MovementController {
+    add_count: bool,
+}
+
+impl MovementController {
+    pub fn new() -> Self {
+        Self { add_count: false }
+    }
+}
 
 fn record_movement_controller(
-    input: Res<ButtonInput<KeyCode>>,
+    mut input: ResMut<ButtonInput<KeyCode>>,
     mut controller_query: Query<&mut MovementController>,
 ) {
     // Collect directional input.
-    let mut intent = Vec2::ZERO;
-    if input.pressed(KeyCode::KeyW) || input.pressed(KeyCode::ArrowUp) {
-        intent.y += 1.0;
-    }
-    if input.pressed(KeyCode::KeyS) || input.pressed(KeyCode::ArrowDown) {
-        intent.y -= 1.0;
-    }
-    if input.pressed(KeyCode::KeyA) || input.pressed(KeyCode::ArrowLeft) {
-        intent.x -= 1.0;
-    }
-    if input.pressed(KeyCode::KeyD) || input.pressed(KeyCode::ArrowRight) {
-        intent.x += 1.0;
-    }
-
-    // Normalize so that diagonal movement has the same speed as
-    // horizontal and vertical movement.
-    let intent = intent.normalize_or_zero();
+    let add_count = if input.clear_just_pressed(KeyCode::Space) {
+        true
+    } else {
+        false
+    };
 
     // Apply movement intent to controllers.
     for mut controller in &mut controller_query {
-        controller.0 = intent;
+        controller.add_count = add_count;
     }
-}
-
-#[derive(Component, Reflect)]
-#[reflect(Component)]
-pub struct Movement {
-    /// Since Bevy's default 2D camera setup is scaled such that
-    /// one unit is one pixel, you can think of this as
-    /// "How many pixels per second should the player move?"
-    /// Note that physics engines may use different unit/pixel ratios.
-    pub speed: f32,
 }
 
 fn apply_movement(
-    time: Res<Time>,
-    mut movement_query: Query<(&MovementController, &Movement, &mut Transform)>,
+    mut movement_query: Query<(
+        &MovementController,
+        &mut RevolutionCount,
+        &Transform,
+        &RevolveZone,
+    )>,
 ) {
-    for (controller, movement, mut transform) in &mut movement_query {
-        let velocity = movement.speed * controller.0;
-        transform.translation += velocity.extend(0.0) * time.delta_seconds();
+    for (controller, mut count, transform, revolve_zone) in &mut movement_query {
+        log::debug!(
+            "inside: {}",
+            revolve_zone.inside(transform.rotation.z.abs()),
+        );
+        if controller.add_count && revolve_zone.inside(transform.rotation.z.abs()) {
+            count.add_count();
+        }
     }
 }
 
 #[derive(Component, Reflect)]
 #[reflect(Component)]
-pub struct WrapWithinWindow;
+pub struct Revolve {
+    pub speed: f32,
+}
 
-fn wrap_within_window(
-    window_query: Query<&Window, With<PrimaryWindow>>,
-    mut wrap_query: Query<&mut Transform, With<WrapWithinWindow>>,
+#[derive(Component, Reflect)]
+#[reflect(Component)]
+pub struct RevolveZone {
+    min: f32,
+    max: f32,
+}
+
+impl RevolveZone {
+    pub fn new(min: f32, max: f32) -> Self {
+        RevolveZone { min, max }
+    }
+    pub fn inside(&self, angle: f32) -> bool {
+        angle < self.max && angle > self.min
+    }
+}
+
+#[derive(Component, Reflect)]
+#[reflect(Component)]
+pub struct RevolutionCount {
+    pub count: u32,
+    pub count_max: u32,
+    decreasing: bool,
+}
+
+impl RevolutionCount {
+    pub fn new(count: u32) -> Self {
+        let count_max = 1;
+        let count = if count > count_max { count_max } else { count };
+        Self {
+            count,
+            count_max,
+            decreasing: false,
+        }
+    }
+
+    pub fn add_count(&mut self) {
+        self.count = std::cmp::min(self.count + 1, self.count_max);
+    }
+}
+fn apply_revolve(
+    time: Res<Time>,
+    mut movement_query: Query<(&Revolve, &mut RevolutionCount, &mut Transform)>,
+    mut commands: Commands,
 ) {
-    let size = window_query.single().size() + 256.0;
-    let half_size = size / 2.0;
-    for mut transform in &mut wrap_query {
-        let position = transform.translation.xy();
-        let wrapped = (position + half_size).rem_euclid(size) - half_size;
-        transform.translation = wrapped.extend(transform.translation.z);
+    for (revolve, mut count, mut transform) in &mut movement_query {
+        let curr_rot = transform.rotation.z;
+        if count.count > 0 {
+            let angle = revolve.speed * time.delta_seconds();
+            transform.rotate_around(Vec3::ZERO, Quat::from_rotation_z(angle));
+            if transform.rotation.z.abs() < curr_rot.abs() && !count.decreasing {
+                count.decreasing = true;
+            } else if transform.rotation.z.abs() > curr_rot.abs() && count.decreasing {
+                count.decreasing = false;
+                count.count -= 1;
+                commands.trigger(AddCycle)
+            }
+        }
+        log::debug!(
+            "rotation: {}, count {}, decreasing {}",
+            transform.rotation.z,
+            count.count,
+            count.decreasing
+        )
     }
 }

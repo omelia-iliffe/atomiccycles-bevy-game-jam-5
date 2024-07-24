@@ -2,18 +2,20 @@
 
 use bevy::prelude::*;
 
-mod animation;
 pub mod assets;
 pub mod audio;
+pub mod cycles;
 mod movement;
 pub mod spawn;
+mod ui;
 
 pub(super) fn plugin(app: &mut App) {
     app.add_plugins((
-        animation::plugin,
         audio::plugin,
         assets::plugin,
         movement::plugin,
         spawn::plugin,
+        cycles::plugin,
+        ui::plugin,
     ));
 }
