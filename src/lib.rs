@@ -9,6 +9,7 @@ use bevy::{
     audio::{AudioPlugin, Volume},
     prelude::*,
 };
+use bevy_mod_picking::prelude::*;
 
 pub struct AppPlugin;
 
@@ -50,6 +51,11 @@ impl Plugin for AppPlugin {
                     },
                     ..default()
                 }),
+        )
+        .add_plugins(
+            DefaultPickingPlugins
+                .build()
+                .disable::<DefaultHighlightingPlugin>(),
         );
 
         // Add other plugins.

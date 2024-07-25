@@ -27,7 +27,7 @@ pub(super) fn plugin(app: &mut App) {
 #[derive(Component, Reflect, Default)]
 #[reflect(Component)]
 pub struct MovementController {
-    add_count: bool,
+    pub add_count: bool,
 }
 
 impl MovementController {
@@ -41,33 +41,32 @@ fn record_movement_controller(
     mut controller_query: Query<&mut MovementController>,
 ) {
     // Collect directional input.
-    let add_count = if input.clear_just_pressed(KeyCode::Space) {
-        true
-    } else {
-        false
-    };
+    let add_count = input.clear_just_pressed(KeyCode::Space);
 
     // Apply movement intent to controllers.
     for mut controller in &mut controller_query {
-        controller.add_count = add_count;
+        if add_count {
+            controller.add_count = true;
+        }
     }
 }
 
 fn apply_movement(
     mut movement_query: Query<(
-        &MovementController,
+        &mut MovementController,
         &mut RevolutionCount,
         &Transform,
         &RevolveZone,
     )>,
 ) {
-    for (controller, mut count, transform, revolve_zone) in &mut movement_query {
+    for (mut controller, mut count, transform, revolve_zone) in &mut movement_query {
         log::debug!(
             "inside: {}",
             revolve_zone.inside(transform.rotation.z.abs()),
         );
         if controller.add_count && revolve_zone.inside(transform.rotation.z.abs()) {
             count.add_count();
+            controller.add_count = false
         }
     }
 }

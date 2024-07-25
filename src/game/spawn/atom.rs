@@ -11,6 +11,8 @@ use bevy::{
     prelude::*,
     sprite::{MaterialMesh2dBundle, Mesh2dHandle},
 };
+use bevy_mod_picking::prelude::*;
+
 pub(super) fn plugin(app: &mut App) {
     app.observe(spawn_atom_scene);
     app.register_type::<Electron>();
@@ -51,7 +53,7 @@ fn spawn_atom_scene(
         MaterialMesh2dBundle {
             mesh: Mesh2dHandle(meshes.add(Rectangle::new(15.0, 30.0))),
             material: materials.add(Color::srgb(1.0, 0.1, 0.1)),
-            transform: Transform::from_xyz(100.0, 0.0, 0.0),
+            transform: Transform::from_xyz(100.0, 0.0, -1.0),
             ..Default::default()
         },
         StateScoped(Screen::Playing),
@@ -69,5 +71,10 @@ fn spawn_atom_scene(
         RevolutionCount::new(2),
         RevolveZone::new(0.0, 0.1),
         StateScoped(Screen::Playing),
+        PickableBundle::default(), // <- Makes the mesh pickable.
+        On::<Pointer<Click>>::target_component_mut::<MovementController>(|_click, controller| {
+            log::info!("Clicked on electron");
+            controller.add_count = true;
+        }),
     ));
 }
