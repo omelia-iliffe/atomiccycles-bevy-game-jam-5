@@ -75,6 +75,20 @@ fn apply_movement(
 #[reflect(Component)]
 pub struct Revolve {
     pub speed: f32,
+    pub multiplier: f32,
+}
+
+impl Revolve {
+    pub fn new(speed: f32) -> Self {
+        Revolve {
+            speed,
+            multiplier: 1.0,
+        }
+    }
+
+    pub fn speed(&self) -> f32 {
+        self.speed * self.multiplier
+    }
 }
 
 #[derive(Component, Reflect)]
@@ -93,7 +107,7 @@ impl RevolveZone {
     }
 }
 
-#[derive(Component, Reflect)]
+#[derive(Component, Reflect, Default)]
 #[reflect(Component)]
 pub struct RevolutionCount {
     pub count: u32,
@@ -104,7 +118,7 @@ pub struct RevolutionCount {
 impl RevolutionCount {
     pub fn new(count: u32) -> Self {
         let count_max = 1;
-        let count = if count > count_max { count_max } else { count };
+        let count = std::cmp::min(count, count_max);
         Self {
             count,
             count_max,
@@ -124,7 +138,7 @@ fn apply_revolve(
     for (revolve, mut count, mut transform) in &mut movement_query {
         let curr_rot = transform.rotation.z;
         if count.count > 0 {
-            let angle = revolve.speed * time.delta_seconds();
+            let angle = revolve.speed() * time.delta_seconds();
             transform.rotate_around(Vec3::ZERO, Quat::from_rotation_z(angle));
             if transform.rotation.z.abs() < curr_rot.abs() && !count.decreasing {
                 count.decreasing = true;

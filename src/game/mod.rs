@@ -8,6 +8,7 @@ pub mod cycles;
 mod movement;
 pub mod spawn;
 mod ui;
+mod upgrades;
 
 pub(super) fn plugin(app: &mut App) {
     app.add_plugins((
@@ -17,5 +18,6 @@ pub(super) fn plugin(app: &mut App) {
         spawn::plugin,
         cycles::plugin,
         ui::plugin,
+        upgrades::plugin,
     ));
 }

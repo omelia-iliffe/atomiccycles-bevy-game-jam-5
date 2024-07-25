@@ -2,10 +2,11 @@
 
 use bevy::prelude::*;
 mod cycle_ui;
+mod upgrades;
 
 pub(super) fn plugin(app: &mut App) {
     app.observe(spawn_level_ui);
-    app.add_plugins((cycle_ui::plugin));
+    app.add_plugins((cycle_ui::plugin, upgrades::plugin));
 }
 
 #[derive(Event, Debug)]
@@ -17,4 +18,5 @@ fn spawn_level_ui(_trigger: Trigger<SpawnLevelUi>, mut commands: Commands) {
     // commands.trigger(SpawnPlayer);
 
     commands.trigger(cycle_ui::SpawnCycleUi);
+    commands.trigger(upgrades::SpawnUpgradesUi);
 }

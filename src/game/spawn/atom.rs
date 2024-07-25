@@ -1,10 +1,7 @@
 //! Spawn the atom scene
 
 use crate::{
-    game::{
-        assets::{HandleMap, ImageKey},
-        movement::{MovementController, RevolutionCount, Revolve, RevolveZone},
-    },
+    game::movement::{MovementController, RevolutionCount, Revolve, RevolveZone},
     screen::Screen,
 };
 use bevy::{
@@ -33,8 +30,6 @@ pub struct Electron;
 fn spawn_atom_scene(
     _trigger: Trigger<SpawnAtomScene>,
     mut commands: Commands,
-    image_handles: Res<HandleMap<ImageKey>>,
-    mut texture_atlas_layouts: ResMut<Assets<TextureAtlasLayout>>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<ColorMaterial>>,
 ) {
@@ -45,8 +40,6 @@ fn spawn_atom_scene(
             material: materials.add(Color::srgb(0.1, 1.0, 0.1)),
             ..Default::default()
         },
-        // WrapWithinWindow,
-        // player_animation,
         StateScoped(Screen::Playing),
     ));
     commands.spawn((
@@ -67,13 +60,12 @@ fn spawn_atom_scene(
             ..Default::default()
         },
         MovementController::new(),
-        Revolve { speed: 3.0 },
+        Revolve::new(3.0),
         RevolutionCount::new(2),
         RevolveZone::new(0.0, 0.1),
         StateScoped(Screen::Playing),
         PickableBundle::default(), // <- Makes the mesh pickable.
         On::<Pointer<Click>>::target_component_mut::<MovementController>(|_click, controller| {
-            log::info!("Clicked on electron");
             controller.add_count = true;
         }),
     ));
