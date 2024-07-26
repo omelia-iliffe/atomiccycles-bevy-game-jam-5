@@ -1,7 +1,7 @@
 //! Spawn the atom scene
 
 use crate::{
-    game::movement::{MovementController, RevolutionCount, Revolve, RevolveZone},
+    game::movement::{MovementController, RevolutionController, Revolve},
     screen::Screen,
 };
 use bevy::{
@@ -9,6 +9,7 @@ use bevy::{
     sprite::{MaterialMesh2dBundle, Mesh2dHandle},
 };
 use bevy_mod_picking::prelude::*;
+use crate::game::movement::BaseTransform;
 
 pub(super) fn plugin(app: &mut App) {
     app.observe(spawn_atom_scene);
@@ -51,18 +52,20 @@ fn spawn_atom_scene(
         },
         StateScoped(Screen::Playing),
     ));
+    let base_transform =
+        BaseTransform(Transform::from_xyz(100.0, 0.0, 0.0));
     commands.spawn((
         Electron,
         MaterialMesh2dBundle {
             mesh: Mesh2dHandle(meshes.add(Rectangle::new(15.0, 15.0))),
             material: materials.add(Color::srgb(0.1, 1.0, 0.1)),
-            transform: Transform::from_xyz(100.0, 0.0, 0.0),
+            transform: base_transform.0,
             ..Default::default()
         },
+        base_transform,
         MovementController::new(),
         Revolve::new(3.0),
-        RevolutionCount::new(2),
-        RevolveZone::new(0.0, 0.1),
+        RevolutionController::new(1, 350_f32.to_radians()),
         StateScoped(Screen::Playing),
         PickableBundle::default(), // <- Makes the mesh pickable.
         On::<Pointer<Click>>::target_component_mut::<MovementController>(|_click, controller| {

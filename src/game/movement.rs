@@ -4,6 +4,7 @@
 //! consider using a [fixed timestep](https://github.com/bevyengine/bevy/blob/main/examples/movement/physics_in_fixed_timestep.rs).
 
 use bevy::prelude::*;
+use std::f32::consts::PI;
 
 use crate::{game::cycles::AddCycle, AppSet};
 
@@ -23,6 +24,9 @@ pub(super) fn plugin(app: &mut App) {
             .in_set(AppSet::Update),
     );
 }
+#[derive(Component, Reflect, Default)]
+#[reflect(Component)]
+pub struct BaseTransform(pub Transform);
 
 #[derive(Component, Reflect, Default)]
 #[reflect(Component)]
@@ -51,20 +55,9 @@ fn record_movement_controller(
     }
 }
 
-fn apply_movement(
-    mut movement_query: Query<(
-        &mut MovementController,
-        &mut RevolutionCount,
-        &Transform,
-        &RevolveZone,
-    )>,
-) {
-    for (mut controller, mut count, transform, revolve_zone) in &mut movement_query {
-        log::debug!(
-            "inside: {}",
-            revolve_zone.inside(transform.rotation.z.abs()),
-        );
-        if controller.add_count && revolve_zone.inside(transform.rotation.z.abs()) {
+fn apply_movement(mut movement_query: Query<(&mut MovementController, &mut RevolutionController)>) {
+    for (mut controller, mut count) in &mut movement_query {
+        if controller.add_count && count.refire_allowed() {
             count.add_count();
             controller.add_count = false
         }
@@ -91,68 +84,55 @@ impl Revolve {
     }
 }
 
-#[derive(Component, Reflect)]
-#[reflect(Component)]
-pub struct RevolveZone {
-    min: f32,
-    max: f32,
-}
-
-impl RevolveZone {
-    pub fn new(min: f32, max: f32) -> Self {
-        RevolveZone { min, max }
-    }
-    pub fn inside(&self, angle: f32) -> bool {
-        angle < self.max && angle > self.min
-    }
-}
-
 #[derive(Component, Reflect, Default)]
 #[reflect(Component)]
-pub struct RevolutionCount {
+pub struct RevolutionController {
     pub count: u32,
     pub count_max: u32,
-    decreasing: bool,
+    pub refire_angle: f32,
+    angle: f32,
 }
 
-impl RevolutionCount {
-    pub fn new(count: u32) -> Self {
-        let count_max = 1;
-        let count = std::cmp::min(count, count_max);
+impl RevolutionController {
+    pub fn new(count_max: u32, refire_angle: f32) -> Self {
         Self {
-            count,
+            count: 0,
             count_max,
-            decreasing: false,
+            angle: 0.,
+            refire_angle,
         }
     }
 
     pub fn add_count(&mut self) {
         self.count = std::cmp::min(self.count + 1, self.count_max);
     }
+
+    pub fn refire_allowed(&self) -> bool {
+        self.angle == 0.0 || self.angle > self.refire_angle
+    }
 }
 fn apply_revolve(
     time: Res<Time>,
-    mut movement_query: Query<(&Revolve, &mut RevolutionCount, &mut Transform)>,
+    mut movement_query: Query<(
+        &Revolve,
+        &mut RevolutionController,
+        &mut Transform,
+        &BaseTransform,
+    )>,
     mut commands: Commands,
 ) {
-    for (revolve, mut count, mut transform) in &mut movement_query {
-        let curr_rot = transform.rotation.z;
+    for (revolve, mut count, mut transform, base) in &mut movement_query {
         if count.count > 0 {
-            let angle = revolve.speed() * time.delta_seconds();
-            transform.rotate_around(Vec3::ZERO, Quat::from_rotation_z(angle));
-            if transform.rotation.z.abs() < curr_rot.abs() && !count.decreasing {
-                count.decreasing = true;
-            } else if transform.rotation.z.abs() > curr_rot.abs() && count.decreasing {
-                count.decreasing = false;
+            count.angle += revolve.speed() * time.delta_seconds();
+            if count.angle > 2.0 * PI {
+                count.angle = 0.0;
                 count.count -= 1;
                 commands.trigger(AddCycle)
             }
+            transform.rotation = base.0.rotation;
+            transform.translation = base.0.translation;
+            transform.rotate_around(Vec3::ZERO, Quat::from_rotation_z(count.angle));
         }
-        log::debug!(
-            "rotation: {}, count {}, decreasing {}",
-            transform.rotation.z,
-            count.count,
-            count.decreasing
-        )
+        log::debug!("rotation: {}, count {}", transform.rotation.z, count.count,)
     }
 }
