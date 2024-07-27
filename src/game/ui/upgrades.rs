@@ -7,12 +7,14 @@ use bevy::{
     prelude::*,
 };
 
-use crate::game::upgrades::{GlobalUpgrades, Upgrade, Upgrades};
+use crate::game::upgrades::{Upgrade, Upgrades};
 use crate::ui::{interaction::InteractionPalette, palette::*};
 
 pub(super) fn plugin(app: &mut App) {
-    app.observe(spawn_upgrades_ui)
-        .add_systems(Update, (mouse_scroll, update_upgrade_text));
+    app.observe(spawn_upgrades_ui).add_systems(
+        Update,
+        (add_new_upgrades, update_upgrade_text, mouse_scroll).chain(),
+    );
 
     #[cfg(feature = "dev")]
     {
@@ -23,6 +25,9 @@ pub(super) fn plugin(app: &mut App) {
 
 #[derive(Event, Debug)]
 pub struct SpawnUpgradesUi;
+
+#[derive(Component)]
+pub struct UpgradeList;
 
 #[derive(Component)]
 pub(crate) struct GlobalUpgradeIndex(pub(crate) usize);
@@ -109,11 +114,36 @@ impl UpgradeTextBundle {
     }
 }
 
+fn add_upgrade_list(parent: &mut ChildBuilder, entity: Entity, name: &Name, upgrades: &Upgrades) {
+    // Container
+    parent
+        .spawn(NodeBundle {
+            style: Style {
+                flex_direction: FlexDirection::Column,
+                align_items: AlignItems::Center,
+                width: Val::Percent(100.),
+                ..default()
+            },
+            ..default()
+        })
+        .with_children(|parent| {
+            // Header
+            parent.spawn(TextBundle::from_section(name, TextStyle::default()));
+            for (index, u) in upgrades.0.iter().enumerate() {
+                // upgrade
+                parent
+                    .spawn((UpgradeButtonBundle::new(), UpgradeEntity { entity, index }))
+                    .with_children(|parent| {
+                        parent.spawn(UpgradeTextBundle::new(u));
+                    });
+            }
+        });
+}
+
 fn spawn_upgrades_ui(
     _trigger: Trigger<SpawnUpgradesUi>,
     mut commands: Commands,
-    global_upgrades: Res<GlobalUpgrades>,
-    query_upgrades: Query<(Entity, &Name, &Upgrades)>,
+    global_upgrades: Res<Upgrades>,
 ) {
     // root node
     commands
@@ -164,6 +194,7 @@ fn spawn_upgrades_ui(
                                 },
                                 ..default()
                             },
+                            UpgradeList,
                             ScrollingList::default(),
                             AccessibilityNode(NodeBuilder::new(Role::List)),
                         ))
@@ -176,45 +207,30 @@ fn spawn_upgrades_ui(
                                         parent.spawn(UpgradeTextBundle::new(u));
                                     });
                             }
-                            for (entity, name, upgrades) in &query_upgrades {
-                                // Container
-                                parent
-                                    .spawn(NodeBundle {
-                                        style: Style {
-                                            flex_direction: FlexDirection::Column,
-                                            align_items: AlignItems::Center,
-                                            width: Val::Percent(100.),
-                                            ..default()
-                                        },
-                                        ..default()
-                                    })
-                                    .with_children(|parent| {
-                                        // Header
-                                        parent.spawn(TextBundle::from_section(
-                                            name,
-                                            TextStyle::default(),
-                                        ));
-                                        for (index, u) in upgrades.0.iter().enumerate() {
-                                            // upgrade
-                                            parent
-                                                .spawn((
-                                                    UpgradeButtonBundle::new(),
-                                                    UpgradeEntity { entity, index },
-                                                ))
-                                                .with_children(|parent| {
-                                                    parent.spawn(UpgradeTextBundle::new(u));
-                                                });
-                                        }
-                                    });
-                            }
+                            // non global upgrades now spawn on Add<Upgrades>
                         });
                 });
         });
 }
 
+fn add_new_upgrades(
+    mut commands: Commands,
+    upgrade_list: Query<(Entity, &UpgradeList)>,
+    upgrades: Query<(Entity, &Name, &Upgrades), Added<Upgrades>>,
+) {
+    let Ok((parent, _)) = upgrade_list.get_single() else {
+        return;
+    };
+    for (entity, name, upgrades) in &upgrades {
+        commands.entity(parent).with_children(|parent| {
+            add_upgrade_list(parent, entity, name, upgrades);
+        });
+    }
+}
+
 fn update_upgrade_text(
     query_upgrades: Query<&Upgrades, Changed<Upgrades>>,
-    global_upgrades: Res<GlobalUpgrades>,
+    global_upgrades: Res<Upgrades>,
     mut query_text: Query<(&Parent, &mut Text, &UpgradeText)>,
     query_parent_global: Query<&GlobalUpgradeIndex>,
     query_parent: Query<&UpgradeEntity>,

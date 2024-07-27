@@ -1,4 +1,5 @@
 use super::{cycles::CycleCount, movement::Revolve};
+use crate::game::spawn::atom::AddElectron;
 use crate::game::ui::upgrades::{GlobalUpgradeIndex, UpgradeEntity};
 use bevy::prelude::*;
 
@@ -8,33 +9,14 @@ pub(super) fn plugin(app: &mut App) {
 }
 
 fn add_global_upgrades(mut commands: Commands) {
-    let upgrades = GlobalUpgrades(vec![
-        Upgrade::new(
-            "Speed Add",
-            None,
-            vec![
-                (1, UpgradeType::SpeedAdd(1.0)),
-                (2, UpgradeType::SpeedAdd(1.0)),
-                (2, UpgradeType::SpeedAdd(1.0)),
-            ],
-        ),
-        Upgrade::new(
-            "Speed Multi",
-            None,
-            vec![
-                (2, UpgradeType::SpeedMult(1.5)),
-                (4, UpgradeType::SpeedMult(2.0)),
-                (8, UpgradeType::SpeedMult(2.5)),
-            ],
-        ),
-    ]);
-    commands.insert_resource(upgrades);
+    commands.insert_resource(Upgrades::global());
 }
 
 #[derive(Debug, Clone)]
 pub enum UpgradeType {
     SpeedAdd(f32),
     SpeedMult(f32),
+    Electron,
 }
 
 impl std::fmt::Display for UpgradeType {
@@ -42,17 +24,22 @@ impl std::fmt::Display for UpgradeType {
         match self {
             UpgradeType::SpeedAdd(v) => write!(f, "Speed +{}", v),
             UpgradeType::SpeedMult(v) => write!(f, "Speed x{}", v),
+            UpgradeType::Electron => write!(f, "New Electron"),
         }
     }
 }
 
-#[derive(Resource, Component)]
-pub struct GlobalUpgrades(pub Vec<Upgrade>);
-
-#[derive(Component)]
+#[derive(Component, Resource)]
 pub struct Upgrades(pub Vec<Upgrade>);
 
 impl Upgrades {
+    pub fn global() -> Self {
+        Self(vec![Upgrade::new(
+            "New Electron",
+            None,
+            vec![(1, UpgradeType::Electron)],
+        )])
+    }
     pub fn electron() -> Self {
         Self(vec![Upgrade::new(
             "Speed Single",
@@ -142,8 +129,9 @@ fn process_upgrade(
     process(upgrade_type)
 }
 fn apply_global_upgrade(
+    mut commands: Commands,
     q_interaction: Query<(&Interaction, &GlobalUpgradeIndex), Changed<Interaction>>,
-    mut upgrades: ResMut<GlobalUpgrades>,
+    mut upgrades: ResMut<Upgrades>,
     mut query: Query<&mut Revolve>,
     mut cycle_count: ResMut<CycleCount>,
 ) {
@@ -168,6 +156,9 @@ fn apply_global_upgrade(
                     for mut r in &mut query {
                         r.multiplier = *mult;
                     }
+                }
+                UpgradeType::Electron => {
+                    commands.trigger(AddElectron);
                 }
             },
         );
@@ -200,6 +191,7 @@ fn apply_upgrade(
                 UpgradeType::SpeedMult(mult) => {
                     revolve.multiplier = *mult;
                 }
+                UpgradeType::Electron => (),
             },
         );
     }
