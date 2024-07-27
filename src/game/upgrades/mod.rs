@@ -1,7 +1,13 @@
+mod upgrade_types;
+
 use super::{cycles::CycleCount, movement::Revolve};
 use crate::game::spawn::atom::AddElectron;
 use crate::game::ui::upgrades::{GlobalUpgradeIndex, UpgradeEntity};
+use crate::game::upgrades::upgrade_types::SingleUpgrade;
 use bevy::prelude::*;
+use upgrade_types::LevelUpgrade;
+
+pub use upgrade_types::Upgrade;
 
 pub(super) fn plugin(app: &mut App) {
     app.add_systems(Startup, add_global_upgrades);
@@ -13,108 +19,61 @@ fn add_global_upgrades(mut commands: Commands) {
 }
 
 #[derive(Debug, Clone)]
-pub enum UpgradeType {
+pub enum UpgradeAction {
     SpeedAdd(f32),
     SpeedMult(f32),
     Electron,
 }
 
-impl std::fmt::Display for UpgradeType {
+impl std::fmt::Display for UpgradeAction {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            UpgradeType::SpeedAdd(v) => write!(f, "Speed +{}", v),
-            UpgradeType::SpeedMult(v) => write!(f, "Speed x{}", v),
-            UpgradeType::Electron => write!(f, "New Electron"),
+            UpgradeAction::SpeedAdd(v) => write!(f, "Speed +{}", v),
+            UpgradeAction::SpeedMult(v) => write!(f, "Speed x{}", v),
+            UpgradeAction::Electron => write!(f, ""),
         }
     }
 }
 
 #[derive(Component, Resource)]
-pub struct Upgrades(pub Vec<Upgrade>);
+pub struct Upgrades(pub Vec<Box<dyn Upgrade + Send + Sync>>);
 
 impl Upgrades {
     pub fn global() -> Self {
-        Self(vec![Upgrade::new(
+        Self(vec![Box::new(SingleUpgrade::new(
             "New Electron",
             None,
-            vec![(1, UpgradeType::Electron)],
-        )])
+            50,
+            UpgradeAction::Electron,
+        ))])
     }
     pub fn electron() -> Self {
-        Self(vec![Upgrade::new(
+        Self(vec![Box::new(LevelUpgrade::new(
             "Speed Single",
             None,
             vec![
-                (1, UpgradeType::SpeedAdd(1.0)),
-                (2, UpgradeType::SpeedAdd(1.0)),
-                (2, UpgradeType::SpeedAdd(1.0)),
+                (1, UpgradeAction::SpeedAdd(1.0)),
+                (2, UpgradeAction::SpeedAdd(1.0)),
+                (2, UpgradeAction::SpeedAdd(1.0)),
             ],
-        )])
-    }
-}
-
-#[derive(Component, Clone)]
-pub struct Upgrade {
-    name: String,
-    description: Option<String>,
-    purchased_level: usize,
-    upgrades: Vec<(u32, UpgradeType)>,
-}
-
-impl Upgrade {
-    pub fn new(name: &str, description: Option<&str>, u_type: Vec<(u32, UpgradeType)>) -> Self {
-        Self {
-            name: name.to_string(),
-            description: description.map(|s| s.to_string()),
-            purchased_level: 0,
-            upgrades: u_type,
-        }
-    }
-
-    pub fn next_cost(&self) -> Option<u32> {
-        self.upgrades
-            .get(self.purchased_level)
-            .map(|(cost, _)| *cost)
-    }
-
-    pub fn name(&self) -> String {
-        if self.purchased_level == self.upgrades.len() {
-            format!("{} MAX", self.name)
-        } else {
-            format!("{} {}", self.name, self.purchased_level + 1)
-        }
-    }
-
-    pub fn description(&self) -> String {
-        if let Some(d) = &self.description {
-            return d.clone();
-        }
-        if let Some((_, upgrade_type)) = self.upgrades.get(self.purchased_level) {
-            return format!("{}", upgrade_type);
-        }
-        "No more upgrades".to_string()
-    }
-
-    pub fn cost(&self) -> String {
-        if let Some(cost) = self.next_cost() {
-            return format!("Cost: {}", cost);
-        }
-        "".to_string()
+        ))])
     }
 }
 
 fn process_upgrade(
-    upgrade: &mut Upgrade,
+    upgrade: &mut dyn Upgrade,
     cycle_count: &mut CycleCount,
-    process: impl FnOnce(&UpgradeType),
+    process: impl FnOnce(&UpgradeAction),
 ) {
     log::info!("Pressed upgrade: {}", upgrade.name());
-    if upgrade.purchased_level == upgrade.upgrades.len() {
+    if upgrade.purchased() {
         log::info!("Upgrade already purchased");
         return;
     }
-    let (cost, upgrade_type) = &upgrade.upgrades[upgrade.purchased_level];
-    let can_purchase = cycle_count.0 >= *cost;
+    let Some(cost) = upgrade.next_cost() else {
+        return;
+    };
+    let can_purchase = cycle_count.0 >= cost;
 
     if !can_purchase {
         log::info!("Cannot purchase upgrade: not enough cycles");
@@ -123,11 +82,15 @@ fn process_upgrade(
 
     cycle_count.0 -= cost;
 
-    log::info!("Purchased upgrade: {}", upgrade.name);
-    upgrade.purchased_level += 1;
+    log::info!("Purchased upgrade: {}", upgrade.name());
 
-    process(upgrade_type)
+    let upgrade_type = upgrade.purchase();
+    match upgrade_type {
+        Some(upgrade_type) => process(upgrade_type),
+        None => log::info!("No more upgrades"),
+    }
 }
+
 fn apply_global_upgrade(
     mut commands: Commands,
     q_interaction: Query<(&Interaction, &GlobalUpgradeIndex), Changed<Interaction>>,
@@ -144,20 +107,20 @@ fn apply_global_upgrade(
             continue;
         };
         process_upgrade(
-            upgrade,
+            upgrade.as_mut(),
             cycle_count.as_mut(),
             |upgrade_type| match upgrade_type {
-                UpgradeType::SpeedAdd(speed) => {
+                UpgradeAction::SpeedAdd(speed) => {
                     for mut r in &mut query {
                         r.speed += speed;
                     }
                 }
-                UpgradeType::SpeedMult(mult) => {
+                UpgradeAction::SpeedMult(mult) => {
                     for mut r in &mut query {
                         r.multiplier = *mult;
                     }
                 }
-                UpgradeType::Electron => {
+                UpgradeAction::Electron => {
                     commands.trigger(AddElectron);
                 }
             },
@@ -182,16 +145,16 @@ fn apply_upgrade(
             continue;
         };
         process_upgrade(
-            upgrade,
+            upgrade.as_mut(),
             cycle_count.as_mut(),
             |upgrade_type| match upgrade_type {
-                UpgradeType::SpeedAdd(speed) => {
+                UpgradeAction::SpeedAdd(speed) => {
                     revolve.speed += speed;
                 }
-                UpgradeType::SpeedMult(mult) => {
+                UpgradeAction::SpeedMult(mult) => {
                     revolve.multiplier = *mult;
                 }
-                UpgradeType::Electron => (),
+                UpgradeAction::Electron => (),
             },
         );
     }

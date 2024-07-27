@@ -7,7 +7,8 @@ use bevy::{
     prelude::*,
 };
 
-use crate::game::upgrades::{Upgrade, Upgrades};
+use crate::game::upgrades::Upgrade;
+use crate::game::upgrades::Upgrades;
 use crate::ui::{interaction::InteractionPalette, palette::*};
 
 pub(super) fn plugin(app: &mut App) {
@@ -94,7 +95,7 @@ struct UpgradeTextBundle {
 }
 
 impl UpgradeTextBundle {
-    pub fn new(upgrade: &Upgrade) -> Self {
+    pub fn new(upgrade: &dyn Upgrade) -> Self {
         Self {
             text_bundle: TextBundle::from_sections([
                 TextSection::new(format!("{}\n", upgrade.name()), TextStyle::default()),
@@ -134,7 +135,7 @@ fn add_upgrade_list(parent: &mut ChildBuilder, entity: Entity, name: &Name, upgr
                 parent
                     .spawn((UpgradeButtonBundle::new(), UpgradeEntity { entity, index }))
                     .with_children(|parent| {
-                        parent.spawn(UpgradeTextBundle::new(u));
+                        parent.spawn(UpgradeTextBundle::new(u.as_ref()));
                     });
             }
         });
@@ -204,7 +205,7 @@ fn spawn_upgrades_ui(
                                 parent
                                     .spawn((UpgradeButtonBundle::new(), GlobalUpgradeIndex(index)))
                                     .with_children(|parent| {
-                                        parent.spawn(UpgradeTextBundle::new(u));
+                                        parent.spawn(UpgradeTextBundle::new(u.as_ref()));
                                     });
                             }
                             // non global upgrades now spawn on Add<Upgrades>
