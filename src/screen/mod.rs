@@ -7,11 +7,13 @@ mod splash;
 mod title;
 
 use bevy::prelude::*;
+use crate::ui::palette::BACKGROUND;
 
 pub(super) fn plugin(app: &mut App) {
     app.init_state::<Screen>();
     app.enable_state_scoped_entities::<Screen>();
 
+    app.insert_resource(ClearColor(BACKGROUND));
     app.add_plugins((
         splash::plugin,
         loading::plugin,
