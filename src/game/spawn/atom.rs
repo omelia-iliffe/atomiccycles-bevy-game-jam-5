@@ -2,6 +2,7 @@
 
 use crate::game::assets::{HandleMap, ImageKey};
 use crate::game::movement::BaseTransform;
+use crate::game::upgrades::Upgrades;
 use crate::{
     game::movement::{MovementController, RevolutionController, Revolve},
     screen::Screen,
@@ -37,20 +38,28 @@ pub struct Electron;
 
 #[derive(Bundle)]
 pub struct ElectronBundle {
+    name: Name,
     marker: Electron,
     sprite: SpriteBundle,
     base_transform: BaseTransform,
     movement_controller: MovementController,
     revolve: Revolve,
     revolution_controller: RevolutionController,
+    upgrades: Upgrades,
     state_scoped: StateScoped<Screen>,
     pickable_bundle: PickableBundle,
     on_click: On<Pointer<Click>>,
 }
 impl ElectronBundle {
-    fn new(radius: f32, image_handles: Res<HandleMap<ImageKey>>) -> Self {
+    fn new(
+        ring: usize,
+        number: usize,
+        radius: f32,
+        image_handles: Res<HandleMap<ImageKey>>,
+    ) -> Self {
         let base_transform = BaseTransform(Transform::from_xyz(radius, 0.0, 10.));
         Self {
+            name: Name::new(format!("Electron {}.{}", ring, number)),
             marker: Electron,
             sprite: SpriteBundle {
                 texture: image_handles[&ImageKey::Electron].clone_weak(),
@@ -63,6 +72,7 @@ impl ElectronBundle {
             revolution_controller: RevolutionController::new(1, 350_f32.to_radians()),
             state_scoped: StateScoped(Screen::Playing),
             pickable_bundle: PickableBundle::default(), // <- Makes the mesh pickable.
+            upgrades: Upgrades::electron(),
             on_click: On::<Pointer<Click>>::target_component_mut::<MovementController>(
                 |_click, controller| {
                     controller.add_count = true;
@@ -108,7 +118,7 @@ fn spawn_atom_scene(
                     },
                 ))
                 .with_children(|parent| {
-                    parent.spawn(ElectronBundle::new(ring_1_radius, image_handles));
+                    parent.spawn(ElectronBundle::new(1, 1, ring_1_radius, image_handles));
                 });
         });
 }

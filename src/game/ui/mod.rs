@@ -2,7 +2,7 @@
 
 use bevy::prelude::*;
 mod cycle_ui;
-mod upgrades;
+pub(crate) mod upgrades;
 
 pub(super) fn plugin(app: &mut App) {
     app.observe(spawn_level_ui);

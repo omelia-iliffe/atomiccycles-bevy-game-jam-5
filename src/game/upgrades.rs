@@ -1,14 +1,14 @@
+use super::{cycles::CycleCount, movement::Revolve};
+use crate::game::ui::upgrades::{GlobalUpgradeIndex, UpgradeEntity};
 use bevy::prelude::*;
 
-use super::{cycles::CycleCount, movement::Revolve};
-
 pub(super) fn plugin(app: &mut App) {
-    app.add_systems(Startup, add_upgrades);
-    app.observe(purchase_upgrade);
+    app.add_systems(Startup, add_global_upgrades);
+    app.add_systems(Update, (apply_upgrade, apply_global_upgrade));
 }
 
-fn add_upgrades(mut commands: Commands) {
-    let upgrades = Upgrades(vec![
+fn add_global_upgrades(mut commands: Commands) {
+    let upgrades = GlobalUpgrades(vec![
         Upgrade::new(
             "Speed Add",
             None,
@@ -35,7 +35,6 @@ fn add_upgrades(mut commands: Commands) {
 pub enum UpgradeType {
     SpeedAdd(f32),
     SpeedMult(f32),
-    None,
 }
 
 impl std::fmt::Display for UpgradeType {
@@ -43,13 +42,29 @@ impl std::fmt::Display for UpgradeType {
         match self {
             UpgradeType::SpeedAdd(v) => write!(f, "Speed +{}", v),
             UpgradeType::SpeedMult(v) => write!(f, "Speed x{}", v),
-            UpgradeType::None => write!(f, "None"),
         }
     }
 }
 
-#[derive(Resource)]
+#[derive(Resource, Component)]
+pub struct GlobalUpgrades(pub Vec<Upgrade>);
+
+#[derive(Component)]
 pub struct Upgrades(pub Vec<Upgrade>);
+
+impl Upgrades {
+    pub fn electron() -> Self {
+        Self(vec![Upgrade::new(
+            "Speed Single",
+            None,
+            vec![
+                (1, UpgradeType::SpeedAdd(1.0)),
+                (2, UpgradeType::SpeedAdd(1.0)),
+                (2, UpgradeType::SpeedAdd(1.0)),
+            ],
+        )])
+    }
+}
 
 #[derive(Component, Clone)]
 pub struct Upgrade {
@@ -101,17 +116,12 @@ impl Upgrade {
     }
 }
 
-#[derive(Event)]
-pub struct PurchaseUpgrade(pub usize);
-
-fn purchase_upgrade(
-    trigger: Trigger<PurchaseUpgrade>,
-    mut q: Query<&mut Revolve>,
-    mut cycle_count: ResMut<CycleCount>,
-    mut upgrades: ResMut<Upgrades>,
+fn process_upgrade(
+    upgrade: &mut Upgrade,
+    cycle_count: &mut CycleCount,
+    process: impl FnOnce(&UpgradeType),
 ) {
-    let upgrade_index = trigger.event().0;
-    let upgrade = upgrades.0.get_mut(upgrade_index).unwrap();
+    log::info!("Pressed upgrade: {}", upgrade.name());
     if upgrade.purchased_level == upgrade.upgrades.len() {
         log::info!("Upgrade already purchased");
         return;
@@ -128,17 +138,69 @@ fn purchase_upgrade(
 
     log::info!("Purchased upgrade: {}", upgrade.name);
     upgrade.purchased_level += 1;
-    match upgrade_type {
-        UpgradeType::SpeedAdd(speed) => {
-            for mut r in &mut q {
-                r.speed += speed;
-            }
+
+    process(upgrade_type)
+}
+fn apply_global_upgrade(
+    q_interaction: Query<(&Interaction, &GlobalUpgradeIndex), Changed<Interaction>>,
+    mut upgrades: ResMut<GlobalUpgrades>,
+    mut query: Query<&mut Revolve>,
+    mut cycle_count: ResMut<CycleCount>,
+) {
+    for (interaction, index) in q_interaction.iter() {
+        if interaction != &Interaction::Pressed {
+            continue;
         }
-        UpgradeType::SpeedMult(mult) => {
-            for mut r in &mut q {
-                r.multiplier = *mult;
-            }
+
+        let Some(upgrade) = upgrades.0.get_mut(index.0) else {
+            continue;
+        };
+        process_upgrade(
+            upgrade,
+            cycle_count.as_mut(),
+            |upgrade_type| match upgrade_type {
+                UpgradeType::SpeedAdd(speed) => {
+                    for mut r in &mut query {
+                        r.speed += speed;
+                    }
+                }
+                UpgradeType::SpeedMult(mult) => {
+                    for mut r in &mut query {
+                        r.multiplier = *mult;
+                    }
+                }
+            },
+        );
+    }
+}
+fn apply_upgrade(
+    q_interaction: Query<(&Interaction, &UpgradeEntity), Changed<Interaction>>,
+    mut q_electron: Query<(&mut Upgrades, &mut Revolve)>,
+
+    mut cycle_count: ResMut<CycleCount>,
+) {
+    for (interaction, index) in q_interaction.iter() {
+        if interaction != &Interaction::Pressed {
+            continue;
         }
-        UpgradeType::None => {}
+
+        let Ok((mut upgrades, mut revolve)) = q_electron.get_mut(index.entity) else {
+            continue;
+        };
+        let Some(upgrade) = upgrades.0.get_mut(index.index) else {
+            continue;
+        };
+        process_upgrade(
+            upgrade,
+            cycle_count.as_mut(),
+            |upgrade_type| match upgrade_type {
+                UpgradeType::SpeedAdd(speed) => {
+                    revolve.speed += speed;
+                }
+                UpgradeType::SpeedMult(mult) => {
+                    revolve.multiplier = *mult;
+                }
+            },
+        );
     }
 }

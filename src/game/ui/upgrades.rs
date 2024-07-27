@@ -7,17 +7,12 @@ use bevy::{
     prelude::*,
 };
 
-use crate::game::upgrades::{PurchaseUpgrade, Upgrades};
+use crate::game::upgrades::{GlobalUpgrades, Upgrade, Upgrades};
 use crate::ui::{interaction::InteractionPalette, palette::*};
 
 pub(super) fn plugin(app: &mut App) {
-    app.observe(spawn_upgrades_ui).add_systems(
-        Update,
-        (
-            mouse_scroll,
-            (upgrade_interaction, update_upgrade_text).chain(),
-        ),
-    );
+    app.observe(spawn_upgrades_ui)
+        .add_systems(Update, (mouse_scroll, update_upgrade_text));
 
     #[cfg(feature = "dev")]
     {
@@ -30,15 +25,95 @@ pub(super) fn plugin(app: &mut App) {
 pub struct SpawnUpgradesUi;
 
 #[derive(Component)]
-struct UpgradeIndex(usize);
+pub(crate) struct GlobalUpgradeIndex(pub(crate) usize);
+
+#[derive(Component)]
+pub(crate) struct UpgradeEntity {
+    pub entity: Entity,
+    pub index: usize,
+}
 
 #[derive(Component)]
 struct UpgradeText;
 
+#[derive(Bundle)]
+struct UpgradeButtonBundle {
+    button_bundle: ButtonBundle,
+    interaction_palette: InteractionPalette,
+}
+
+impl UpgradeButtonBundle {
+    pub fn new() -> Self {
+        Self {
+            button_bundle: ButtonBundle {
+                style: Style {
+                    flex_direction: FlexDirection::Column,
+                    align_items: AlignItems::FlexStart,
+                    margin: UiRect {
+                        bottom: Val::Percent(2.),
+                        ..default()
+                    },
+                    padding: UiRect {
+                        left: Val::Px(10.),
+                        right: Val::Px(10.),
+                        top: Val::Px(10.),
+                        bottom: Val::Px(10.),
+                    },
+                    border: UiRect {
+                        left: Val::Px(1.),
+                        right: Val::Px(1.),
+                        top: Val::Px(1.),
+                        bottom: Val::Px(1.),
+                    },
+                    width: Val::Percent(100.),
+                    ..default()
+                },
+                background_color: BackgroundColor(NODE_BACKGROUND),
+                ..default()
+            },
+            interaction_palette: InteractionPalette {
+                none: NODE_BACKGROUND,
+                hovered: BUTTON_HOVERED_BACKGROUND,
+                pressed: BUTTON_PRESSED_BACKGROUND,
+            },
+        }
+    }
+}
+
+#[derive(Bundle)]
+struct UpgradeTextBundle {
+    text_bundle: TextBundle,
+    upgrade_text: UpgradeText,
+    label: Label,
+    accessibility_node: AccessibilityNode,
+}
+
+impl UpgradeTextBundle {
+    pub fn new(upgrade: &Upgrade) -> Self {
+        Self {
+            text_bundle: TextBundle::from_sections([
+                TextSection::new(format!("{}\n", upgrade.name()), TextStyle::default()),
+                TextSection::new(
+                    format!("{}\n", upgrade.description()),
+                    TextStyle {
+                        font_size: 18.,
+                        ..default()
+                    },
+                ),
+                TextSection::new(upgrade.cost(), TextStyle::default()),
+            ]),
+            upgrade_text: UpgradeText,
+            label: Label,
+            accessibility_node: AccessibilityNode(NodeBuilder::new(Role::ListItem)),
+        }
+    }
+}
+
 fn spawn_upgrades_ui(
     _trigger: Trigger<SpawnUpgradesUi>,
     mut commands: Commands,
-    upgrades: Res<Upgrades>,
+    global_upgrades: Res<GlobalUpgrades>,
+    query_upgrades: Query<(Entity, &Name, &Upgrades)>,
 ) {
     // root node
     commands
@@ -94,65 +169,42 @@ fn spawn_upgrades_ui(
                         ))
                         .with_children(|parent| {
                             // List items
-                            for (index, u) in upgrades.0.iter().enumerate() {
+                            for (index, u) in global_upgrades.0.iter().enumerate() {
                                 parent
-                                    .spawn((
-                                        ButtonBundle {
-                                            style: Style {
-                                                flex_direction: FlexDirection::Column,
-                                                align_items: AlignItems::FlexStart,
-                                                margin: UiRect {
-                                                    bottom: Val::Percent(2.),
-                                                    ..default()
-                                                },
-                                                padding: UiRect {
-                                                    left: Val::Px(10.),
-                                                    right: Val::Px(10.),
-                                                    top: Val::Px(10.),
-                                                    bottom: Val::Px(10.),
-                                                },
-                                                border: UiRect {
-                                                    left: Val::Px(1.),
-                                                    right: Val::Px(1.),
-                                                    top: Val::Px(1.),
-                                                    bottom: Val::Px(1.),
-                                                },
-                                                width: Val::Percent(100.),
-                                                ..default()
-                                            },
-                                            background_color: BackgroundColor(NODE_BACKGROUND),
+                                    .spawn((UpgradeButtonBundle::new(), GlobalUpgradeIndex(index)))
+                                    .with_children(|parent| {
+                                        parent.spawn(UpgradeTextBundle::new(u));
+                                    });
+                            }
+                            for (entity, name, upgrades) in &query_upgrades {
+                                // Container
+                                parent
+                                    .spawn(NodeBundle {
+                                        style: Style {
+                                            flex_direction: FlexDirection::Column,
+                                            align_items: AlignItems::Center,
+                                            width: Val::Percent(100.),
                                             ..default()
                                         },
-                                        InteractionPalette {
-                                            none: NODE_BACKGROUND,
-                                            hovered: BUTTON_HOVERED_BACKGROUND,
-                                            pressed: BUTTON_PRESSED_BACKGROUND,
-                                        },
-                                        UpgradeIndex(index),
-                                    ))
+                                        ..default()
+                                    })
                                     .with_children(|parent| {
-                                        parent.spawn((
-                                            TextBundle::from_sections([
-                                                TextSection::new(
-                                                    format!("{}\n", u.name()),
-                                                    TextStyle::default(),
-                                                ),
-                                                TextSection::new(
-                                                    format!("{}\n", u.description()),
-                                                    TextStyle {
-                                                        font_size: 18.,
-                                                        ..default()
-                                                    },
-                                                ),
-                                                TextSection::new(
-                                                    format!("{}", u.cost()),
-                                                    TextStyle::default(),
-                                                ),
-                                            ]),
-                                            UpgradeText,
-                                            Label,
-                                            AccessibilityNode(NodeBuilder::new(Role::ListItem)),
+                                        // Header
+                                        parent.spawn(TextBundle::from_section(
+                                            name,
+                                            TextStyle::default(),
                                         ));
+                                        for (index, u) in upgrades.0.iter().enumerate() {
+                                            // upgrade
+                                            parent
+                                                .spawn((
+                                                    UpgradeButtonBundle::new(),
+                                                    UpgradeEntity { entity, index },
+                                                ))
+                                                .with_children(|parent| {
+                                                    parent.spawn(UpgradeTextBundle::new(u));
+                                                });
+                                        }
                                     });
                             }
                         });
@@ -160,36 +212,31 @@ fn spawn_upgrades_ui(
         });
 }
 
-fn upgrade_interaction(
-    mut commands: Commands,
-    q: Query<(&Interaction, &UpgradeIndex), Changed<Interaction>>,
-    upgrades: Res<Upgrades>,
-) {
-    for (interaction, index) in q.iter() {
-        let upgrade = upgrades.0.get(index.0).unwrap();
-        match interaction {
-            Interaction::Pressed => {
-                log::info!("Pressed upgrade: {}", upgrade.name());
-                commands.trigger(PurchaseUpgrade(index.0))
-                // upgrade.purchased = true;O
-            }
-            _ => {}
-        }
-    }
-}
-
 fn update_upgrade_text(
-    upgrades: Res<Upgrades>,
-    mut child_q: Query<(&Parent, &mut Text, &UpgradeText)>,
-    parent_q: Query<&UpgradeIndex>,
+    query_upgrades: Query<&Upgrades, Changed<Upgrades>>,
+    global_upgrades: Res<GlobalUpgrades>,
+    mut query_text: Query<(&Parent, &mut Text, &UpgradeText)>,
+    query_parent_global: Query<&GlobalUpgradeIndex>,
+    query_parent: Query<&UpgradeEntity>,
 ) {
-    if !upgrades.is_changed() {
-        return;
-    }
+    for (parent, mut text, _) in query_text.iter_mut() {
+        let upgrade = if let Ok(index) = query_parent_global.get(parent.get()) {
+            if !global_upgrades.is_changed() {
+                continue;
+            }
+            global_upgrades.0.get(index.0)
+        } else if let Ok(index) = query_parent.get(parent.get()) {
+            query_upgrades
+                .get(index.entity)
+                .ok()
+                .and_then(|upgrades| upgrades.0.get(index.index))
+        } else {
+            continue;
+        };
 
-    for (parent, mut text, _) in child_q.iter_mut() {
-        let index = parent_q.get(parent.get()).unwrap();
-        let upgrade = upgrades.0.get(index.0).unwrap();
+        let Some(upgrade) = upgrade else {
+            continue;
+        };
         text.sections[0].value = format!("{}\n", upgrade.name());
         text.sections[1].value = format!("{}\n", upgrade.description());
         text.sections[2].value = upgrade.cost();

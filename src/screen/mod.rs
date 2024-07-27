@@ -6,8 +6,8 @@ mod playing;
 mod splash;
 mod title;
 
-use bevy::prelude::*;
 use crate::ui::palette::BACKGROUND;
+use bevy::prelude::*;
 
 pub(super) fn plugin(app: &mut App) {
     app.init_state::<Screen>();
