@@ -43,20 +43,35 @@ impl Upgrades {
         Self(vec![Box::new(SingleUpgrade::new(
             "New Electron",
             None,
-            50,
+            15,
             UpgradeAction::Electron,
         ))])
     }
     pub fn electron() -> Self {
         Self(vec![Box::new(LevelUpgrade::new(
-            "Speed Single",
+            "Add Speed",
             None,
             vec![
                 (1, UpgradeAction::SpeedAdd(1.0)),
                 (2, UpgradeAction::SpeedAdd(1.0)),
-                (2, UpgradeAction::SpeedAdd(1.0)),
+                (4, UpgradeAction::SpeedAdd(1.0)),
+                (8, UpgradeAction::SpeedAdd(1.0)),
+                (16, UpgradeAction::SpeedAdd(1.0)),
+                (32, UpgradeAction::SpeedAdd(1.0)),
             ],
-        ))])
+        )),
+                  Box::new(LevelUpgrade::new(
+                      "Multiply Speed",
+                      None,
+                      vec![
+                          (1, UpgradeAction::SpeedMult(1.1)),
+                          (2, UpgradeAction::SpeedAdd(1.1)),
+                          (4, UpgradeAction::SpeedAdd(1.1)),
+                          (8, UpgradeAction::SpeedAdd(1.1)),
+                          (16, UpgradeAction::SpeedAdd(1.1)),
+                          (32, UpgradeAction::SpeedAdd(1.1)),
+                      ],
+                  ))])
     }
 }
 
