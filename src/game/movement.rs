@@ -131,7 +131,7 @@ fn apply_revolve(
             }
             transform.rotation = base.0.rotation;
             transform.translation = base.0.translation;
-            transform.rotate_around(Vec3::ZERO, Quat::from_rotation_z(count.angle));
+            transform.translate_around(Vec3::ZERO, Quat::from_rotation_z(count.angle));
         }
         log::debug!("rotation: {}, count {}", transform.rotation.z, count.count,)
     }
