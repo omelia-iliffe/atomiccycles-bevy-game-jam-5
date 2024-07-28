@@ -1,7 +1,7 @@
 mod upgrade_types;
 
 use super::{cycles::CycleCount, movement::Revolve};
-use crate::game::spawn::atom::{add_electron, Electron, Ring};
+use crate::game::spawn::atom::{add_electron, add_ring, Atom, Electron, Ring};
 use crate::game::ui::upgrades::{GlobalUpgradeIndex, UpgradeEntity};
 use crate::game::upgrades::upgrade_types::SingleUpgrade;
 use bevy::prelude::*;
@@ -24,6 +24,7 @@ pub enum UpgradeAction {
     SpeedAdd(f32),
     SpeedMult(f32),
     Electron,
+    Ring,
 }
 
 impl std::fmt::Display for UpgradeAction {
@@ -32,6 +33,7 @@ impl std::fmt::Display for UpgradeAction {
             UpgradeAction::SpeedAdd(v) => write!(f, "Speed +{}", v),
             UpgradeAction::SpeedMult(v) => write!(f, "Speed x{}", v),
             UpgradeAction::Electron => write!(f, ""),
+            UpgradeAction::Ring => write!(f, ""),
         }
     }
 }
@@ -49,10 +51,10 @@ impl Upgrades {
                 UpgradeAction::Electron,
             )),
             Box::new(SingleUpgrade::new(
-                "New Electron",
+                "New Ring",
                 None,
                 15,
-                UpgradeAction::Electron,
+                UpgradeAction::Ring,
             )),
         ])
     }
@@ -135,6 +137,11 @@ fn apply_global_upgrade(
     image_handles: Res<HandleMap<ImageKey>>,
     query_ring: Query<(Entity, &Children, &Ring)>,
     query_electrons: Query<(&Parent, &Electron)>,
+
+    query_atom: Query<(Entity, &Children), With<Atom>>,
+    query_rings: Query<&Ring>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<ColorMaterial>>,
 ) {
     for (interaction, index) in q_interaction.iter() {
         if interaction != &Interaction::Pressed {
@@ -167,7 +174,15 @@ fn apply_global_upgrade(
                         &query_ring,
                         &query_electrons,
                     )
-
+                },
+                UpgradeAction::Ring => {
+                    add_ring(
+                        &mut commands,
+                        &query_atom,
+                        &query_rings,
+                        meshes.as_mut(),
+                        materials.as_mut(),
+                    )
                 }
             },
         );
@@ -202,7 +217,7 @@ fn apply_upgrade(
                     revolve.multiplier = *mult;
                     true
                 }
-                UpgradeAction::Electron => false,
+                UpgradeAction::Electron | UpgradeAction::Ring => false,
             },
         );
     }

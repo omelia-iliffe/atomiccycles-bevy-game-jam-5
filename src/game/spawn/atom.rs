@@ -144,6 +144,36 @@ fn spawn_atom_scene(
         });
 }
 
+pub fn add_ring(
+    commands: &mut Commands,
+    query_atom: &Query<(Entity, &Children), With<Atom>>,
+    query_rings: &Query<&Ring>,
+    meshes: &mut Assets<Mesh>,
+    materials: &mut Assets<ColorMaterial>,
+
+) -> bool {
+    let (atom, children) = query_atom.get_single().unwrap();
+    let ring_count = children.iter().filter(|child| query_rings.get(**child).is_ok()).count();
+
+    let ring = Ring::new(ring_count);
+    let ring_radius = ring.radius();
+    commands.entity(atom).with_children(|parent| {
+        parent
+            .spawn((
+                ring,
+                MaterialMesh2dBundle {
+                    mesh: Mesh2dHandle(meshes.add(Circle::new(ring_radius))),
+                    material: materials.add(Color::srgba_u8(0x28, 0x66, 0x6e, 0x66)),
+                    transform: Transform::from_xyz(0., 0., -100.),
+                    ..default()
+                },
+            ));
+    });
+
+    true
+
+}
+
 pub fn add_electron(
     commands: &mut Commands,
     image_handles: &HandleMap<ImageKey>,
