@@ -12,9 +12,11 @@ use bevy::{
     sprite::{MaterialMesh2dBundle, Mesh2dHandle},
 };
 use bevy_mod_picking::prelude::*;
+use rand::random;
 
 pub(super) fn plugin(app: &mut App) {
     app.observe(spawn_atom_scene);
+    app.observe(add_proton_neutron);
 }
 
 #[derive(Event, Debug)]
@@ -41,6 +43,14 @@ impl Ring {
         100. + (self.index as f32 * 50.)
     }
 }
+
+#[derive(Component, Debug, Clone, Copy, PartialEq, Eq, Default, Reflect)]
+#[reflect(Component)]
+pub struct InNucleus;
+
+#[derive(Component, Debug, Clone, Copy, PartialEq, Eq, Default, Reflect)]
+#[reflect(Component)]
+pub struct Neutron;
 
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq, Default, Reflect)]
 #[reflect(Component)]
@@ -121,6 +131,7 @@ fn spawn_atom_scene(
             // Spawn Proton
             parent.spawn((
                 Proton,
+                InNucleus,
                 SpriteBundle {
                     texture: image_handles[&ImageKey::Proton].clone_weak(),
                     ..Default::default()
@@ -225,5 +236,43 @@ pub fn add_electron(
         ));
     });
 
+    commands.trigger(AddProtonNeutron);
+
     true
+}
+
+#[derive(Event)]
+pub struct AddProtonNeutron;
+
+fn add_proton_neutron(
+    _trigger: Trigger<AddProtonNeutron>,
+    mut commands: Commands,
+    query_atom: Query<Entity, With<Atom>>,
+    image_handles: Res<HandleMap<ImageKey>>,
+) {
+   let Ok(atom) = query_atom.get_single() else {
+         return;
+   };
+    commands.entity(atom).with_children(|parent| {
+         parent.spawn((
+              Proton,
+             InNucleus,
+              SpriteBundle {
+                texture: image_handles[&ImageKey::Proton].clone_weak(),
+                  transform: Transform::from_xyz((random::<f32>()*2.)-1., (random::<f32>()*2.)-1., 0.),
+                ..Default::default()
+              },
+              StateScoped(Screen::Playing),
+         ));
+        parent.spawn((
+            Neutron,
+            InNucleus,
+            SpriteBundle {
+                texture: image_handles[&ImageKey::Neutron].clone_weak(),
+                transform: Transform::from_xyz((random::<f32>()*2.)-1., (random::<f32>()*2.)-1., 0.),
+                ..Default::default()
+            },
+            StateScoped(Screen::Playing),
+        ));
+    });
 }

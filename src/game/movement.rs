@@ -19,7 +19,7 @@ pub(super) fn plugin(app: &mut App) {
     // Apply movement based on controls.
     app.add_systems(
         Update,
-        (apply_movement, apply_revolve)
+        (apply_movement, apply_revolve, update_nucleus_packing)
             .chain()
             .in_set(AppSet::Update),
     );
@@ -134,5 +134,25 @@ fn apply_revolve(
             transform.translate_around(Vec3::ZERO, Quat::from_rotation_z(count.angle));
         }
         log::debug!("rotation: {}, count {}", transform.rotation.z, count.count,)
+    }
+}
+const NUCLEUS_PACKING_RADIUS: f32 = 16.0;
+
+fn update_nucleus_packing(
+    mut query_nucleus: Query<(&InNucleus, &mut Transform)>
+) {
+    let mut iter = query_nucleus.iter_combinations_mut();
+    while let Some([(_, mut a_transform), (_, mut b_transform)] ) = iter.fetch_next() {
+        let distance = a_transform.translation.distance(b_transform.translation);
+        if distance < NUCLEUS_PACKING_RADIUS - 0.1 {
+            let a_translation = a_transform.translation;
+            let b_translation = b_transform.translation;
+            let mut direction = a_translation - b_translation;
+            let distance = direction.length();
+            let penetration = NUCLEUS_PACKING_RADIUS - distance;
+            let correction = direction.normalize() * penetration * 0.30;
+            a_transform.translation += correction;
+            b_transform.translation -= correction;
+        }
     }
 }

@@ -19,6 +19,7 @@ pub(super) fn plugin(app: &mut App) {
 pub enum ImageKey {
     Electron,
     Proton,
+    Neutron,
 }
 
 impl AssetKey for ImageKey {
@@ -42,6 +43,15 @@ impl FromWorld for HandleMap<ImageKey> {
                 ImageKey::Proton,
                 asset_server.load_with_settings(
                     "images/atom_proton.png",
+                    |settings: &mut ImageLoaderSettings| {
+                        settings.sampler = ImageSampler::nearest();
+                    },
+                ),
+            ),
+            (
+                ImageKey::Neutron,
+                asset_server.load_with_settings(
+                    "images/atom_neutron.png",
                     |settings: &mut ImageLoaderSettings| {
                         settings.sampler = ImageSampler::nearest();
                     },

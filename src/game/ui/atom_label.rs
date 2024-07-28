@@ -191,6 +191,6 @@ fn update_atom_label_text(
             return;
         }
         label.0 = count;
-        text.sections[0].value = format!("{}", label.label());
+        text.sections[0].value = label.label().to_string();
     }
 }
