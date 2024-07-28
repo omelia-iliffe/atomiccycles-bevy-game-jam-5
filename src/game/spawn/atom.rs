@@ -71,7 +71,14 @@ impl ElectronBundle {
         radius: f32,
         image_handles: &HandleMap<ImageKey>,
     ) -> Self {
-        let base_transform = BaseTransform(Transform::from_xyz(radius, 0.0, 10.));
+        let rotation = if ring_index==0 {
+            360./2. * index as f32
+        } else {
+            360./8. * index as f32
+        }.to_radians();
+        let mut transform = Transform::from_xyz(radius, 0.0, 10.);
+        transform.rotate_around(Vec3::ZERO, Quat::from_rotation_z(rotation));
+        let base_transform = BaseTransform(transform);
         Self {
             name: Name::new(format!("Electron {}.{}", ring_index + 1, index + 1)),
             marker: Electron,
