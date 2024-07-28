@@ -1,5 +1,5 @@
 [package]
-name = "lifecycles"
+name = "atomiccycles"
 authors = ["Omelia Iliffe <omelia.iliffe@wetaworkshop.co.nz>"]
 version = "0.1.0"
 edition = "2021"

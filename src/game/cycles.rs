@@ -3,7 +3,7 @@
 use bevy::prelude::*;
 
 pub(super) fn plugin(app: &mut App) {
-    app.insert_resource(CycleCount(0));
+    app.insert_resource(CycleCount(5));
     app.observe(add_cycle);
 }
 
