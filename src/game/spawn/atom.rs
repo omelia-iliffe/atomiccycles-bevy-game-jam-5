@@ -14,7 +14,7 @@ use bevy::{
 use bevy_mod_picking::prelude::*;
 
 pub(super) fn plugin(app: &mut App) {
-    app.observe(spawn_atom_scene).observe(add_electron);
+    app.observe(spawn_atom_scene);
 }
 
 #[derive(Event, Debug)]
@@ -69,7 +69,7 @@ impl ElectronBundle {
         ring_index: usize,
         index: usize,
         radius: f32,
-        image_handles: Res<HandleMap<ImageKey>>,
+        image_handles: &HandleMap<ImageKey>,
     ) -> Self {
         let base_transform = BaseTransform(Transform::from_xyz(radius, 0.0, 10.));
         Self {
@@ -138,22 +138,18 @@ fn spawn_atom_scene(
                         ring_index,
                         0,
                         ring_radius,
-                        image_handles,
+                        image_handles.as_ref(),
                     ));
                 });
         });
 }
 
-#[derive(Event)]
-pub struct AddElectron;
-
 pub fn add_electron(
-    _trigger: Trigger<AddElectron>,
-    mut commands: Commands,
-    image_handles: Res<HandleMap<ImageKey>>,
-    query: Query<(Entity, &Children, &Ring)>,
-    query_electrons: Query<(&Parent, &Electron)>,
-) {
+    commands: &mut Commands,
+    image_handles: &HandleMap<ImageKey>,
+    query: &Query<(Entity, &Children, &Ring)>,
+    query_electrons: &Query<(&Parent, &Electron)>,
+) -> bool {
     let rings = query
         .iter()
         .sort_by_key::<&Ring, _>(|ring| ring.index)
@@ -172,7 +168,7 @@ pub fn add_electron(
             None
         }
     }) else {
-        return;
+        return false;
     };
 
     commands.entity(parent).with_children(|parent| {
@@ -183,4 +179,6 @@ pub fn add_electron(
             image_handles,
         ));
     });
+
+    true
 }

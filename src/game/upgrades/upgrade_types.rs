@@ -3,7 +3,8 @@ use crate::game::upgrades::UpgradeAction;
 pub trait Upgrade {
     /// Depleted, fully purchased, purchased, cannot not be bought anymore ever
     fn purchased(&self) -> bool;
-    fn purchase(&mut self) -> Option<&UpgradeAction>;
+    fn upgrade_action(&self) -> Option<&UpgradeAction>;
+    fn purchase(&mut self) -> Result<(), String>;
     fn next_cost(&self) -> Option<u32>;
     fn name(&self) -> String;
     fn description(&self) -> String;
@@ -34,12 +35,15 @@ impl Upgrade for SingleUpgrade {
     fn purchased(&self) -> bool {
         self.purchased
     }
-    fn purchase(&mut self) -> Option<&UpgradeAction> {
+    fn upgrade_action(&self) -> Option<&UpgradeAction> {
+        Some(&self.upgrade)
+    }
+    fn purchase(&mut self) -> Result<(), String> {
         if self.purchased {
-            return None;
+            return Err("Already purchased".to_string());
         }
         self.purchased = true;
-        Some(&self.upgrade)
+        Ok(())
     }
     fn next_cost(&self) -> Option<u32> {
         if self.purchased {
@@ -86,13 +90,17 @@ impl Upgrade for LevelUpgrade {
     fn purchased(&self) -> bool {
         self.purchased_level == self.upgrades.len()
     }
-    fn purchase(&mut self) -> Option<&UpgradeAction> {
-        let upgrade = self.upgrades.get(self.purchased_level).map(|(_, u)| u);
 
-        if upgrade.is_some() {
-            self.purchased_level += 1;
+    fn upgrade_action(&self) -> Option<&UpgradeAction> {
+        self.upgrades.get(self.purchased_level).map(|(_, u)| u)
+    }
+    fn purchase(&mut self) -> Result<(), String> {
+        if self.purchased() {
+            return Err("Already purchased".to_string());
         }
-        upgrade
+        self.purchased_level += 1;
+
+        Ok(())
     }
     fn next_cost(&self) -> Option<u32> {
         self.upgrades
@@ -115,6 +123,7 @@ impl Upgrade for LevelUpgrade {
         }
         "No more upgrades".to_string()
     }
+
     fn cost(&self) -> String {
         if let Some(cost) = self.next_cost() {
             return format!("Cost: {}", cost);
