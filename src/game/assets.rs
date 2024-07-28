@@ -42,7 +42,7 @@ impl FromWorld for HandleMap<ImageKey> {
             (
                 ImageKey::Proton,
                 asset_server.load_with_settings(
-                    "images/atom_proton.png",
+                    "images/atom_proton_transparent.png",
                     |settings: &mut ImageLoaderSettings| {
                         settings.sampler = ImageSampler::nearest();
                     },
@@ -51,7 +51,7 @@ impl FromWorld for HandleMap<ImageKey> {
             (
                 ImageKey::Neutron,
                 asset_server.load_with_settings(
-                    "images/atom_neutron.png",
+                    "images/atom_neutron_transparent.png",
                     |settings: &mut ImageLoaderSettings| {
                         settings.sampler = ImageSampler::nearest();
                     },
