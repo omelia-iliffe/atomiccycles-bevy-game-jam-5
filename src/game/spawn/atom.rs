@@ -250,26 +250,34 @@ fn add_proton_neutron(
     query_atom: Query<Entity, With<Atom>>,
     image_handles: Res<HandleMap<ImageKey>>,
 ) {
-   let Ok(atom) = query_atom.get_single() else {
-         return;
-   };
+    let Ok(atom) = query_atom.get_single() else {
+        return;
+    };
     commands.entity(atom).with_children(|parent| {
-         parent.spawn((
-              Proton,
-             InNucleus,
-              SpriteBundle {
+        parent.spawn((
+            Proton,
+            InNucleus,
+            SpriteBundle {
                 texture: image_handles[&ImageKey::Proton].clone_weak(),
-                  transform: Transform::from_xyz((random::<f32>()*2.)-1., (random::<f32>()*2.)-1., 0.),
+                transform: Transform::from_xyz(
+                    (random::<f32>() * 2.) - 1.,
+                    (random::<f32>() * 2.) - 1.,
+                    0.,
+                ),
                 ..Default::default()
-              },
-              StateScoped(Screen::Playing),
-         ));
+            },
+            StateScoped(Screen::Playing),
+        ));
         parent.spawn((
             Neutron,
             InNucleus,
             SpriteBundle {
                 texture: image_handles[&ImageKey::Neutron].clone_weak(),
-                transform: Transform::from_xyz((random::<f32>()*2.)-1., (random::<f32>()*2.)-1., 0.),
+                transform: Transform::from_xyz(
+                    (random::<f32>() * 2.) - 1.,
+                    (random::<f32>() * 2.) - 1.,
+                    0.,
+                ),
                 ..Default::default()
             },
             StateScoped(Screen::Playing),
