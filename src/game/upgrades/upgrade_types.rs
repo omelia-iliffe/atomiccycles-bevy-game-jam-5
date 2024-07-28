@@ -68,6 +68,76 @@ impl Upgrade for SingleUpgrade {
     }
 }
 
+pub struct RecurringUpgrade {
+    name: String,
+    description: Option<String>,
+    num_purchases: usize,
+    max_purchases: usize,
+    upgrade: UpgradeAction,
+    cost_fn: Box<dyn Fn(usize) -> u32 + Send + Sync>,
+}
+
+impl RecurringUpgrade {
+    pub fn new(
+        name: &str,
+        description: Option<&str>,
+        max_purchases: usize,
+        upgrade: UpgradeAction,
+        cost_fn: impl Fn(usize) -> u32 + 'static + Send + Sync,
+    ) -> Self {
+        Self {
+            name: name.to_string(),
+            description: description.map(|s| s.to_string()),
+            num_purchases: 0,
+            max_purchases,
+            upgrade,
+            cost_fn: Box::new(cost_fn),
+        }
+    }
+}
+
+impl Upgrade for RecurringUpgrade{
+    fn purchased(&self) -> bool {
+        self.num_purchases == self.max_purchases
+    }
+    fn upgrade_action(&self) -> Option<&UpgradeAction> {
+        Some(&self.upgrade)
+    }
+    fn purchase(&mut self) -> Result<(), String> {
+        if self.purchased() {
+            return Err("Already purchased".to_string());
+        }
+        self.num_purchases += 1;
+        Ok(())
+    }
+    fn next_cost(&self) -> Option<u32> {
+        if self.purchased() {
+            return None;
+        }
+        Some(self.cost_fn.as_ref()(self.num_purchases))
+    }
+    fn name(&self) -> String {
+        if self.purchased() {
+            format!("{} MAX", self.name)
+        } else {
+            format!("{} {}", self.name, self.num_purchases + 1)
+        }
+    }
+    fn description(&self) -> String {
+        if let Some(d) = &self.description {
+            return d.clone();
+        }
+        format!("{}", self.upgrade)
+    }
+    fn cost(&self) -> String {
+        if self.purchased() {
+            return "Purchased".to_string();
+        }
+        format!("Cost: {}", self.next_cost().unwrap())
+    }
+
+}
+
 pub struct LevelUpgrade {
     name: String,
     description: Option<String>,

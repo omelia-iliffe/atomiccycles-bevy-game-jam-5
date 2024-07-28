@@ -177,7 +177,7 @@ pub fn add_ring(
 pub fn add_electron(
     commands: &mut Commands,
     image_handles: &HandleMap<ImageKey>,
-    query: &Query<(Entity, &Children, &Ring)>,
+    query: &Query<(Entity, Option<&Children>, &Ring)>,
     query_electrons: &Query<(&Parent, &Electron)>,
 ) -> bool {
     let rings = query
@@ -185,16 +185,19 @@ pub fn add_electron(
         .sort_by_key::<&Ring, _>(|ring| ring.index)
         .collect::<Vec<_>>();
 
-    let Some((parent, ring, index)) = rings.into_iter().find_map(|(parent, children, ring)| {
+    let Some((parent, ring, index)) = rings.into_iter().find_map(|(parent, maybe_children, ring)| {
         let mut electron_count = 0;
-        for child in children {
-            if query_electrons.get(*child).is_ok() {
-                electron_count += 1;
+        if let Some(children) = maybe_children {
+            for child in children {
+                if query_electrons.get(*child).is_ok() {
+                    electron_count += 1;
+                }
             }
         }
         if electron_count < ring.max_electrons {
             Some((parent, ring, electron_count))
         } else {
+            log::info!("Ring {} is full", ring.index);
             None
         }
     }) else {

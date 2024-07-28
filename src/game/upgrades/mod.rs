@@ -3,7 +3,7 @@ mod upgrade_types;
 use super::{cycles::CycleCount, movement::Revolve};
 use crate::game::spawn::atom::{add_electron, add_ring, Atom, Electron, Ring};
 use crate::game::ui::upgrades::{GlobalUpgradeIndex, UpgradeEntity};
-use crate::game::upgrades::upgrade_types::SingleUpgrade;
+use crate::game::upgrades::upgrade_types::{RecurringUpgrade, SingleUpgrade};
 use bevy::prelude::*;
 use upgrade_types::LevelUpgrade;
 
@@ -44,17 +44,19 @@ pub struct Upgrades(pub Vec<Box<dyn Upgrade + Send + Sync>>);
 impl Upgrades {
     pub fn global() -> Self {
         Self(vec![
-            Box::new(SingleUpgrade::new(
+            Box::new(RecurringUpgrade::new(
                 "New Electron",
                 None,
-                15,
+                (1+8+8+8+8),
                 UpgradeAction::Electron,
+                |count| 10 * 2u32.pow(count as u32),
             )),
-            Box::new(SingleUpgrade::new(
+            Box::new(RecurringUpgrade::new(
                 "New Ring",
                 None,
-                15,
+                5,
                 UpgradeAction::Ring,
+                |count| 10 * 2u32.pow(count as u32),
             )),
         ])
     }
@@ -119,8 +121,8 @@ fn process_upgrade(
         return;
     }
 
-    if upgrade.purchase().is_err() {
-        log::error!("Failed to purchase upgrade");
+    if let Err(e) = upgrade.purchase() {
+        log::error!("Failed to purchase upgrade: {e}");
         return;
     }
     cycle_count.0 -= cost;
@@ -135,7 +137,7 @@ fn apply_global_upgrade(
     mut query_revolve: Query<&mut Revolve>,
     mut cycle_count: ResMut<CycleCount>,
     image_handles: Res<HandleMap<ImageKey>>,
-    query_ring: Query<(Entity, &Children, &Ring)>,
+    query_ring: Query<(Entity, Option<&Children>, &Ring)>,
     query_electrons: Query<(&Parent, &Electron)>,
 
     query_atom: Query<(Entity, &Children), With<Atom>>,
