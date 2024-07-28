@@ -39,7 +39,7 @@ fn spawn_cycle_ui(_trigger: Trigger<SpawnCycleUi>, mut commands: Commands) {
         .with_style(Style {
             position_type: PositionType::Absolute,
             bottom: Val::Px(5.0),
-            right: Val::Px(5.0),
+            left: Val::Px(5.0),
             ..default()
         }),
         CycleCountText,
