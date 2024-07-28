@@ -96,7 +96,7 @@ impl RecurringUpgrade {
     }
 }
 
-impl Upgrade for RecurringUpgrade{
+impl Upgrade for RecurringUpgrade {
     fn purchased(&self) -> bool {
         self.num_purchases == self.max_purchases
     }
@@ -135,7 +135,6 @@ impl Upgrade for RecurringUpgrade{
         }
         format!("Cost: {}", self.next_cost().unwrap())
     }
-
 }
 
 pub struct LevelUpgrade {

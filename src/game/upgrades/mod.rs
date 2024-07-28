@@ -3,7 +3,7 @@ mod upgrade_types;
 use super::{cycles::CycleCount, movement::Revolve};
 use crate::game::spawn::atom::{add_electron, add_ring, Atom, Electron, Ring};
 use crate::game::ui::upgrades::{GlobalUpgradeIndex, UpgradeEntity};
-use crate::game::upgrades::upgrade_types::{RecurringUpgrade, SingleUpgrade};
+use crate::game::upgrades::upgrade_types::RecurringUpgrade;
 use bevy::prelude::*;
 use upgrade_types::LevelUpgrade;
 
@@ -47,7 +47,7 @@ impl Upgrades {
             Box::new(RecurringUpgrade::new(
                 "New Electron",
                 None,
-                (1+8+8+8+8),
+                1 + 8 + 8 + 8 + 8,
                 UpgradeAction::Electron,
                 |count| 10 * 2u32.pow(count as u32),
             )),
@@ -169,23 +169,19 @@ fn apply_global_upgrade(
                     }
                     true
                 }
-                UpgradeAction::Electron => {
-                    add_electron(
-                        &mut commands,
-                        image_handles.as_ref(),
-                        &query_ring,
-                        &query_electrons,
-                    )
-                },
-                UpgradeAction::Ring => {
-                    add_ring(
-                        &mut commands,
-                        &query_atom,
-                        &query_rings,
-                        meshes.as_mut(),
-                        materials.as_mut(),
-                    )
-                }
+                UpgradeAction::Electron => add_electron(
+                    &mut commands,
+                    image_handles.as_ref(),
+                    &query_ring,
+                    &query_electrons,
+                ),
+                UpgradeAction::Ring => add_ring(
+                    &mut commands,
+                    &query_atom,
+                    &query_rings,
+                    meshes.as_mut(),
+                    materials.as_mut(),
+                ),
             },
         );
     }

@@ -71,11 +71,12 @@ impl ElectronBundle {
         radius: f32,
         image_handles: &HandleMap<ImageKey>,
     ) -> Self {
-        let rotation = if ring_index==0 {
-            360./2. * index as f32
+        let rotation = if ring_index == 0 {
+            360. / 2. * index as f32
         } else {
-            360./8. * index as f32
-        }.to_radians();
+            360. / 8. * index as f32
+        }
+        .to_radians();
         let mut transform = Transform::from_xyz(radius, 0.0, 10.);
         transform.rotate_around(Vec3::ZERO, Quat::from_rotation_z(rotation));
         let base_transform = BaseTransform(transform);
@@ -157,28 +158,28 @@ pub fn add_ring(
     query_rings: &Query<&Ring>,
     meshes: &mut Assets<Mesh>,
     materials: &mut Assets<ColorMaterial>,
-
 ) -> bool {
     let (atom, children) = query_atom.get_single().unwrap();
-    let ring_count = children.iter().filter(|child| query_rings.get(**child).is_ok()).count();
+    let ring_count = children
+        .iter()
+        .filter(|child| query_rings.get(**child).is_ok())
+        .count();
 
     let ring = Ring::new(ring_count);
     let ring_radius = ring.radius();
     commands.entity(atom).with_children(|parent| {
-        parent
-            .spawn((
-                ring,
-                MaterialMesh2dBundle {
-                    mesh: Mesh2dHandle(meshes.add(Circle::new(ring_radius))),
-                    material: materials.add(Color::srgba_u8(0x28, 0x66, 0x6e, 0x66)),
-                    transform: Transform::from_xyz(0., 0., -100.),
-                    ..default()
-                },
-            ));
+        parent.spawn((
+            ring,
+            MaterialMesh2dBundle {
+                mesh: Mesh2dHandle(meshes.add(Circle::new(ring_radius))),
+                material: materials.add(Color::srgba_u8(0x28, 0x66, 0x6e, 0x66)),
+                transform: Transform::from_xyz(0., 0., -100.),
+                ..default()
+            },
+        ));
     });
 
     true
-
 }
 
 pub fn add_electron(
@@ -192,22 +193,26 @@ pub fn add_electron(
         .sort_by_key::<&Ring, _>(|ring| ring.index)
         .collect::<Vec<_>>();
 
-    let Some((parent, ring, index)) = rings.into_iter().find_map(|(parent, maybe_children, ring)| {
-        let mut electron_count = 0;
-        if let Some(children) = maybe_children {
-            for child in children {
-                if query_electrons.get(*child).is_ok() {
-                    electron_count += 1;
+    let Some((parent, ring, index)) =
+        rings
+            .into_iter()
+            .find_map(|(parent, maybe_children, ring)| {
+                let mut electron_count = 0;
+                if let Some(children) = maybe_children {
+                    for child in children {
+                        if query_electrons.get(*child).is_ok() {
+                            electron_count += 1;
+                        }
+                    }
                 }
-            }
-        }
-        if electron_count < ring.max_electrons {
-            Some((parent, ring, electron_count))
-        } else {
-            log::info!("Ring {} is full", ring.index);
-            None
-        }
-    }) else {
+                if electron_count < ring.max_electrons {
+                    Some((parent, ring, electron_count))
+                } else {
+                    log::info!("Ring {} is full", ring.index);
+                    None
+                }
+            })
+    else {
         return false;
     };
 
