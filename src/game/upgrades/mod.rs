@@ -49,42 +49,32 @@ impl Upgrades {
                 None,
                 1 + 8 + 8 + 8 + 8,
                 UpgradeAction::Electron,
-                |count| 10 * 2u32.pow(count as u32),
+                |count| 5 * count as u32,
             )),
             Box::new(RecurringUpgrade::new(
                 "New Ring",
                 None,
                 5,
                 UpgradeAction::Ring,
-                |count| 10 * 2u32.pow(count as u32),
+                |count| 10 * count as u32,
             )),
         ])
     }
     pub fn electron() -> Self {
         Self(vec![
-            Box::new(LevelUpgrade::new(
-                "Add Speed",
+            Box::new(RecurringUpgrade::new(
+                "Speed",
                 None,
-                vec![
-                    (1, UpgradeAction::SpeedAdd(1.0)),
-                    (2, UpgradeAction::SpeedAdd(1.0)),
-                    (4, UpgradeAction::SpeedAdd(1.0)),
-                    (8, UpgradeAction::SpeedAdd(1.0)),
-                    (16, UpgradeAction::SpeedAdd(1.0)),
-                    (32, UpgradeAction::SpeedAdd(1.0)),
-                ],
+                10,
+                UpgradeAction::SpeedAdd(1.0),
+                |count| 2 * count as u32,
             )),
-            Box::new(LevelUpgrade::new(
+            Box::new(RecurringUpgrade::new(
                 "Multiply Speed",
                 None,
-                vec![
-                    (1, UpgradeAction::SpeedMult(1.1)),
-                    (2, UpgradeAction::SpeedAdd(1.1)),
-                    (4, UpgradeAction::SpeedAdd(1.1)),
-                    (8, UpgradeAction::SpeedAdd(1.1)),
-                    (16, UpgradeAction::SpeedAdd(1.1)),
-                    (32, UpgradeAction::SpeedAdd(1.1)),
-                ],
+                10,
+                UpgradeAction::SpeedMult(1.2),
+                |count| 3 * count as u32,
             )),
         ])
     }
