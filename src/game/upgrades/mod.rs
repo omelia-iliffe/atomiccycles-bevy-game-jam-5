@@ -5,7 +5,6 @@ use crate::game::spawn::atom::{add_electron, add_ring, Atom, Electron, Ring};
 use crate::game::ui::upgrades::{GlobalUpgradeIndex, UpgradeEntity};
 use crate::game::upgrades::upgrade_types::RecurringUpgrade;
 use bevy::prelude::*;
-use upgrade_types::LevelUpgrade;
 
 use crate::game::assets::{HandleMap, ImageKey};
 pub use upgrade_types::Upgrade;
@@ -47,16 +46,16 @@ impl Upgrades {
             Box::new(RecurringUpgrade::new(
                 "New Electron",
                 None,
-                1 + 8 + 8 + 8 + 8,
+                1 + 8 + 8 + 2,
                 UpgradeAction::Electron,
-                |count| 5 * count as u32,
+                |count| 5 * (count as u32 + 1),
             )),
             Box::new(RecurringUpgrade::new(
                 "New Ring",
                 None,
-                5,
+                4,
                 UpgradeAction::Ring,
-                |count| 10 * count as u32,
+                |count| 25 + (10 * count as u32),
             )),
         ])
     }
