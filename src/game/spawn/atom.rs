@@ -70,7 +70,6 @@ pub struct ElectronBundle {
     revolve: Revolve,
     revolution_controller: RevolutionController,
     upgrades: Upgrades,
-    state_scoped: StateScoped<Screen>,
     pickable_bundle: PickableBundle,
     on_click: On<Pointer<Click>>,
 }
@@ -102,7 +101,6 @@ impl ElectronBundle {
             movement_controller: MovementController::new(),
             revolve: Revolve::new(3.0),
             revolution_controller: RevolutionController::new(1, 350_f32.to_radians()),
-            state_scoped: StateScoped(Screen::Playing),
             pickable_bundle: PickableBundle::default(), // <- Makes the mesh pickable.
             upgrades: Upgrades::electron(),
             on_click: On::<Pointer<Click>>::target_component_mut::<MovementController>(
@@ -266,7 +264,6 @@ fn add_proton_neutron(
                 ),
                 ..Default::default()
             },
-            StateScoped(Screen::Playing),
         ));
         parent.spawn((
             Neutron,
@@ -280,7 +277,6 @@ fn add_proton_neutron(
                 ),
                 ..Default::default()
             },
-            StateScoped(Screen::Playing),
         ));
     });
 }
