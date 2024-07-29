@@ -24,8 +24,8 @@
      inkscape:deskcolor="#d1d1d1"
      inkscape:document-units="mm"
      inkscape:zoom="0.76662259"
-     inkscape:cx="24.784033"
-     inkscape:cy="617.6442"
+     inkscape:cx="202.18554"
+     inkscape:cy="581.12036"
      inkscape:window-width="2560"
      inkscape:window-height="1494"
      inkscape:window-x="-11"
@@ -69,7 +69,8 @@
        cx="52.545818"
        cy="-80.328156"
        r="3.96875"
-       transform="scale(1,-1)" />
+       transform="scale(1,-1)"
+       inkscape:label="neutron" />
     <g
        id="g2"
        transform="matrix(0.11138713,0,0,0.11138713,40.476468,80.367499)"
@@ -103,6 +104,31 @@
          id="text2"
          style="font-size:3.175px;fill:#ffffff;fill-opacity:1;stroke-width:5.14441"
          aria-label="-" />
+    </g>
+    <circle
+       style="fill:#c6d8af;stroke-width:0.0294712;fill-opacity:0.80000001"
+       id="circle4"
+       cx="36.805061"
+       cy="-83.683746"
+       r="3.96875"
+       transform="scale(1,-1)"
+       inkscape:label="neutron-transparent" />
+    <g
+       id="g5"
+       transform="matrix(0.11138713,0,0,0.11138713,28.823428,78.59819)"
+       inkscape:label="proton-transparent">
+      <circle
+         style="fill:#7a306c;fill-opacity:0.8;stroke-width:0.264583"
+         id="circle5"
+         cx="108.35497"
+         cy="-77.117516"
+         r="35.630238"
+         transform="scale(1,-1)" />
+      <path
+         d="m 127.28485,79.528956 h -16.428 V 95.956957 H 105.8531 V 79.528956 h -16.428 v -4.8229 h 16.428 V 58.278075 h 5.00375 v 16.427981 h 16.428 z"
+         id="path5"
+         style="font-size:3.175px;fill:#ffffff;fill-opacity:1;stroke-width:5.14441"
+         aria-label="+" />
     </g>
   </g>
 </svg>
