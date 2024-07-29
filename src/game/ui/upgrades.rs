@@ -21,6 +21,7 @@ pub(super) fn plugin(app: &mut App) {
         Update,
         (
             add_new_upgrades,
+            update_buy_next_ring,
             update_cycle_upgrades,
             update_electron_upgrades,
             update_speed_upgrades,
@@ -259,7 +260,7 @@ fn add_new_upgrades(
                                                     ..default()
                                                 },
                                             ),
-                                            TextSection::new("2", TextStyle::default()),
+                                            TextSection::new("0", TextStyle::default()),
                                             TextSection::new(
                                                 "\nCost: ",
                                                 TextStyle {
@@ -282,7 +283,7 @@ fn add_new_upgrades(
                                     ));
                                 });
                             // SPEED upgrade
-                            let speed_cost = compute_speed_cost(INITIAL_REVOLVE_SPEED);
+                            let speed_cost = compute_speed_cost(ring.index,0);
                             parent
                                 .spawn((UpgradeButtonBundle::new(30.), SpeedUpgrade(entity)))
                                 .with_children(|parent| {
@@ -295,7 +296,7 @@ fn add_new_upgrades(
                                                     ..default()
                                                 },
                                             ),
-                                            TextSection::new("2", TextStyle::default()),
+                                            TextSection::new(format!("{:.2}", INITIAL_REVOLVE_SPEED), TextStyle::default()),
                                             TextSection::new(
                                                 "\nCost: ",
                                                 TextStyle {
@@ -318,7 +319,7 @@ fn add_new_upgrades(
                                     ));
                                 });
                             // CYCLE
-                            let cycle_cost = compute_cycle_cost(None);
+                            let cycle_cost = compute_cycle_cost(ring.index, None);
                             parent
                                 .spawn((UpgradeButtonBundle::new(30.), CycleUpgrade(entity)))
                                 .with_children(|parent| {
@@ -331,7 +332,7 @@ fn add_new_upgrades(
                                                     ..default()
                                                 },
                                             ),
-                                            TextSection::new("".to_string(), TextStyle::default()),
+                                            TextSection::new(" ".to_string(), TextStyle::default()),
                                             TextSection::new(
                                                 "s",
                                                 TextStyle {
@@ -377,13 +378,35 @@ fn add_new_upgrades(
     }
 }
 
+fn update_buy_next_ring(
+    query_ring: Query<&Ring, Added<Ring>>,
+    query_upgrade: Query<&Children, With<BuyNextRing>>,
+    mut query_upgrade_text: Query<&mut Text, With<UpgradeText>>,
+) {
+    for ring in &query_ring {
+        let cost = compute_ring_cost(ring.index+1);
+
+        let Ok(upgrade_entity) = query_upgrade.get_single() else {
+            continue;
+        };
+
+
+        let Ok(mut text) = query_upgrade_text.get_mut(upgrade_entity[0]) else {
+            continue;
+        };
+
+        text.sections[2].value = format!("{}", cost);
+    }
+
+}
+
 fn update_speed_upgrades(
-    query_ring: Query<(Entity, &Revolve), Changed<Revolve>>,
+    query_ring: Query<(Entity, &Ring, &Revolve), Changed<Revolve>>,
     query_upgrade: Query<(&SpeedUpgrade, &Children)>,
     mut query_upgrade_text: Query<&mut Text, With<UpgradeText>>,
 ) {
-    for (entity, revolve) in &query_ring {
-        let cost = compute_speed_cost(revolve.speed());
+    for (entity,ring, revolve) in &query_ring {
+        let cost = compute_speed_cost(ring.index, revolve.level);
 
         let Some(upgrade_entity) = query_upgrade
             .iter()
@@ -410,7 +433,7 @@ fn update_cycle_upgrades(
 ) {
     for (entity, ring) in &query_ring {
         let duration = ring.cycle_timer.as_ref().map(|t| t.duration());
-        let cost = compute_cycle_cost(duration);
+        let cost = compute_cycle_cost(ring.index, duration);
 
         let Some(upgrade_entity) = query_upgrade
             .iter()
@@ -428,7 +451,7 @@ fn update_cycle_upgrades(
             Some(duration) => {
                 format!("{:.2}", duration.as_secs_f32())
             }
-            None => "".to_string(),
+            None => " ".to_string(),
         };
 
         text.sections[4].value = format!("{}", cost);
@@ -472,8 +495,14 @@ fn update_electron_upgrades(
             continue;
         };
 
-        text.sections[1].value = format!("{}", electron_count);
-        text.sections[3].value = format!("{}", cost);
+        if ring.max_electrons == electron_count {
+            text.sections[1].value = "Full".to_string();
+            text.sections[2].value = " ".to_string();
+            text.sections[3].value = " ".to_string();
+        } else {
+            text.sections[1].value = format!("{}", electron_count);
+            text.sections[3].value = format!("{}", cost);
+        }
     }
 }
 

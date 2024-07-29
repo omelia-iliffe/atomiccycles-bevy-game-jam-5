@@ -1,5 +1,6 @@
 pub mod costs;
 
+use std::time::Duration;
 use super::{cycles::CycleCount, movement::Revolve};
 use crate::game::assets::{HandleMap, ImageKey};
 use crate::game::spawn::atom::{AddProton, AddProtonNeutron, Atom, Electron, ElectronBundle, Ring};
@@ -88,28 +89,30 @@ fn apply_speed_upgrade(
     q_interaction: Query<(&Interaction, &SpeedUpgrade), Changed<Interaction>>,
     mut cycle_count: ResMut<CycleCount>,
 
-    mut query_ring: Query<&mut Revolve>,
+    mut query_ring: Query<(&Ring, &mut Revolve)>,
 ) {
     for (interaction, entity) in &q_interaction {
         if interaction != &Interaction::Pressed {
             continue;
         }
 
-        let Ok(mut ring) = query_ring.get_mut(entity.0) else {
+        let Ok((ring, mut revolve)) = query_ring.get_mut(entity.0) else {
             continue;
         };
 
-        let cost = costs::compute_speed_cost(ring.speed);
+        let cost = costs::compute_speed_cost(ring.index, revolve.level);
         if cost > cycle_count.0 {
             log::info!("Cannot afford speed upgrade: not enough cycles");
             continue;
         }
 
-        ring.speed += 1.0;
+        revolve.speed += 1.0;
+        revolve.level += 1;
         cycle_count.0 -= cost;
     }
 }
 
+const INITIAL_CYCLE_TIME: Duration = Duration::from_secs(3);
 fn apply_cycle_upgrade(
     q_interaction: Query<(&Interaction, &CycleUpgrade), Changed<Interaction>>,
     mut cycle_count: ResMut<CycleCount>,
@@ -125,16 +128,16 @@ fn apply_cycle_upgrade(
             continue;
         };
 
-        let cost = costs::compute_ring_cost(ring.index);
+        let cost = costs::compute_cycle_cost(ring.index, ring.cycle_timer.as_ref().map(|timer| timer.duration()));
         if cost > cycle_count.0 {
             log::info!("Cannot afford cycle speed upgrade: not enough cycles");
             continue;
         }
 
         if let Some(timer) = ring.cycle_timer.as_mut() {
-            timer.set_duration(timer.duration() / 2);
+            timer.set_duration(timer.duration() *4 /5);
         } else {
-            ring.cycle_timer = Some(Timer::from_seconds(5., TimerMode::Repeating));
+            ring.cycle_timer = Some(Timer::new(INITIAL_CYCLE_TIME, TimerMode::Repeating));
         }
 
         cycle_count.0 -= cost;

@@ -69,19 +69,19 @@ fn apply_movement(mut movement_query: Query<(&mut MovementController, &mut Revol
 #[reflect(Component)]
 pub struct Revolve {
     pub speed: f32,
-    pub multiplier: f32,
+    pub level: u32,
 }
 
 impl Revolve {
     pub fn new(speed: f32) -> Self {
         Revolve {
             speed,
-            multiplier: 1.0,
+            level: 0,
         }
     }
 
     pub fn speed(&self) -> f32 {
-        self.speed * self.multiplier
+        self.speed
     }
 }
 
