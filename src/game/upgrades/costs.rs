@@ -2,6 +2,8 @@ use std::time::Duration;
 
 pub fn compute_electron_cost(rings: usize, electrons: usize) -> u32 {
     5 * (electrons as u32 + 1) * (rings as u32 + 1).pow(2)
+pub const STARTING_CYCLES: u32 = compute_ring_cost(0) + compute_electron_cost(0, 0);
+
 }
 
 pub fn compute_ring_cost(count: usize) -> u32 {
