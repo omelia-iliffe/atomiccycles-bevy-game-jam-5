@@ -121,7 +121,7 @@ fn spawn_atom_scene(_trigger: Trigger<SpawnAtomScene>, mut commands: Commands) {
 pub struct AddProton;
 
 fn add_proton(
-    _trigger: Trigger<AddProtonNeutron>,
+    _trigger: Trigger<AddProton>,
     mut commands: Commands,
     query_atom: Query<Entity, With<Atom>>,
     image_handles: Res<HandleMap<ImageKey>>,
