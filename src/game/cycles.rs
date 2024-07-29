@@ -1,12 +1,12 @@
 //! Count the number of cycles for use as currency
 
-use bevy::prelude::*;
-use crate::AppSet;
 use crate::game::upgrades::costs::STARTING_CYCLES;
+use crate::AppSet;
+use bevy::prelude::*;
 
 pub(super) fn plugin(app: &mut App) {
     app.insert_resource(CycleCount(STARTING_CYCLES))
-    .observe(add_cycle)
+        .observe(add_cycle)
         .add_systems(
             Update,
             record_movement_controller.in_set(AppSet::RecordInput),
@@ -35,7 +35,4 @@ fn record_movement_controller(
     if input.clear_just_pressed(KeyCode::KeyN) {
         cycle_count.0 += 10;
     }
-
-
-
 }

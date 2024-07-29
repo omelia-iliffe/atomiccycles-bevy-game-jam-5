@@ -1,11 +1,11 @@
 pub mod costs;
 
-use std::time::Duration;
 use super::{cycles::CycleCount, movement::Revolve};
 use crate::game::assets::{HandleMap, ImageKey};
 use crate::game::spawn::atom::{AddProton, AddProtonNeutron, Atom, Electron, ElectronBundle, Ring};
 use bevy::prelude::*;
 use bevy::sprite::{MaterialMesh2dBundle, Mesh2dHandle};
+use std::time::Duration;
 
 pub(super) fn plugin(app: &mut App) {
     app.add_systems(
@@ -128,14 +128,17 @@ fn apply_cycle_upgrade(
             continue;
         };
 
-        let cost = costs::compute_cycle_cost(ring.index, ring.cycle_timer.as_ref().map(|timer| timer.duration()));
+        let cost = costs::compute_cycle_cost(
+            ring.index,
+            ring.cycle_timer.as_ref().map(|timer| timer.duration()),
+        );
         if cost > cycle_count.0 {
             log::info!("Cannot afford cycle speed upgrade: not enough cycles");
             continue;
         }
 
         if let Some(timer) = ring.cycle_timer.as_mut() {
-            timer.set_duration(timer.duration() *4 /5);
+            timer.set_duration(timer.duration() * 4 / 5);
         } else {
             ring.cycle_timer = Some(Timer::new(INITIAL_CYCLE_TIME, TimerMode::Repeating));
         }

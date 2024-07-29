@@ -74,10 +74,7 @@ pub struct Revolve {
 
 impl Revolve {
     pub fn new(speed: f32) -> Self {
-        Revolve {
-            speed,
-            level: 0,
-        }
+        Revolve { speed, level: 0 }
     }
 
     pub fn speed(&self) -> f32 {

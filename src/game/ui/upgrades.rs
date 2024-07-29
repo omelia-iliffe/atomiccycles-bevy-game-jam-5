@@ -147,8 +147,7 @@ fn spawn_upgrades_ui(_trigger: Trigger<SpawnUpgradesUi>, mut commands: Commands)
                             AccessibilityNode(NodeBuilder::new(Role::List)),
                         ))
                         .with_children(|parent| {
-                            //     // List items
-                            //     // TODO: Add ring one here
+                            // List items
                             parent
                                 .spawn((NodeBundle {
                                     style: Style {
@@ -283,7 +282,7 @@ fn add_new_upgrades(
                                     ));
                                 });
                             // SPEED upgrade
-                            let speed_cost = compute_speed_cost(ring.index,0);
+                            let speed_cost = compute_speed_cost(ring.index, 0);
                             parent
                                 .spawn((UpgradeButtonBundle::new(30.), SpeedUpgrade(entity)))
                                 .with_children(|parent| {
@@ -296,7 +295,10 @@ fn add_new_upgrades(
                                                     ..default()
                                                 },
                                             ),
-                                            TextSection::new(format!("{:.2}", INITIAL_REVOLVE_SPEED), TextStyle::default()),
+                                            TextSection::new(
+                                                format!("{:.2}", INITIAL_REVOLVE_SPEED),
+                                                TextStyle::default(),
+                                            ),
                                             TextSection::new(
                                                 "\nCost: ",
                                                 TextStyle {
@@ -384,12 +386,11 @@ fn update_buy_next_ring(
     mut query_upgrade_text: Query<&mut Text, With<UpgradeText>>,
 ) {
     for ring in &query_ring {
-        let cost = compute_ring_cost(ring.index+1);
+        let cost = compute_ring_cost(ring.index + 1);
 
         let Ok(upgrade_entity) = query_upgrade.get_single() else {
             continue;
         };
-
 
         let Ok(mut text) = query_upgrade_text.get_mut(upgrade_entity[0]) else {
             continue;
@@ -397,7 +398,6 @@ fn update_buy_next_ring(
 
         text.sections[2].value = format!("{}", cost);
     }
-
 }
 
 fn update_speed_upgrades(
@@ -405,7 +405,7 @@ fn update_speed_upgrades(
     query_upgrade: Query<(&SpeedUpgrade, &Children)>,
     mut query_upgrade_text: Query<&mut Text, With<UpgradeText>>,
 ) {
-    for (entity,ring, revolve) in &query_ring {
+    for (entity, ring, revolve) in &query_ring {
         let cost = compute_speed_cost(ring.index, revolve.level);
 
         let Some(upgrade_entity) = query_upgrade

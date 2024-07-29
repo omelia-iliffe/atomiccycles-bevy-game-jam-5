@@ -15,7 +15,6 @@ pub(super) fn plugin(app: &mut App) {
 pub struct SpawnAtomLabel;
 
 fn spawn_cycle_ui(_trigger: Trigger<SpawnAtomLabel>, mut commands: Commands) {
-
     commands.spawn((
         TextBundle::from_sections([
             TextSection::new(
