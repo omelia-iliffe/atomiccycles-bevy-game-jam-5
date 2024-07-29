@@ -3,6 +3,7 @@
 use bevy::prelude::*;
 
 use crate::game::spawn::atom::Electron;
+use crate::screen::Screen;
 use crate::ui::palette::BUTTON_TEXT;
 
 pub(super) fn plugin(app: &mut App) {
@@ -44,6 +45,7 @@ fn spawn_cycle_ui(_trigger: Trigger<SpawnAtomLabel>, mut commands: Commands) {
             ..default()
         }),
         AtomLabelText::new(),
+        StateScoped(Screen::Playing),
     ));
 }
 

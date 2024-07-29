@@ -126,6 +126,7 @@ fn spawn_atom_scene(
             Atom,
             TransformBundle::default(),
             InheritedVisibility::default(),
+            StateScoped(Screen::Playing),
         ))
         .with_children(|parent| {
             // Spawn Proton
@@ -136,7 +137,6 @@ fn spawn_atom_scene(
                     texture: image_handles[&ImageKey::Proton].clone_weak(),
                     ..Default::default()
                 },
-                StateScoped(Screen::Playing),
             ));
             // Spawn First Ring
             let ring = Ring::new(0);

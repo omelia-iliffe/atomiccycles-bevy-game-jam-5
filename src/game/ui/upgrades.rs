@@ -9,6 +9,7 @@ use bevy::{
 
 use crate::game::upgrades::Upgrade;
 use crate::game::upgrades::Upgrades;
+use crate::screen::Screen;
 use crate::ui::{interaction::InteractionPalette, palette::*};
 
 pub(super) fn plugin(app: &mut App) {
@@ -148,17 +149,20 @@ fn spawn_upgrades_ui(
 ) {
     // root node
     commands
-        .spawn(NodeBundle {
-            style: Style {
-                flex_direction: FlexDirection::Column,
-                justify_content: JustifyContent::Center,
-                align_items: AlignItems::Center,
-                width: Val::Px(300.),
-                height: Val::Percent(95.),
+        .spawn((
+            NodeBundle {
+                style: Style {
+                    flex_direction: FlexDirection::Column,
+                    justify_content: JustifyContent::Center,
+                    align_items: AlignItems::Center,
+                    width: Val::Px(300.),
+                    height: Val::Percent(95.),
+                    ..default()
+                },
                 ..default()
             },
-            ..default()
-        })
+            StateScoped(Screen::Playing),
+        ))
         .with_children(|parent| {
             // Title
             parent.spawn((

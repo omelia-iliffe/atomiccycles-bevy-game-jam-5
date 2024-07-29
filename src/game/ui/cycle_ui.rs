@@ -2,6 +2,7 @@
 
 use bevy::prelude::*;
 
+use crate::screen::Screen;
 use crate::{game::cycles::CycleCount, ui::palette::BUTTON_TEXT};
 
 pub(super) fn plugin(app: &mut App) {
@@ -43,6 +44,7 @@ fn spawn_cycle_ui(_trigger: Trigger<SpawnCycleUi>, mut commands: Commands) {
             ..default()
         }),
         CycleCountText,
+        StateScoped(Screen::Playing),
     ));
 }
 
