@@ -8,7 +8,7 @@ pub mod cycles;
 mod movement;
 pub mod spawn;
 mod ui;
-mod upgrades;
+pub mod upgrades;
 
 pub(super) fn plugin(app: &mut App) {
     app.add_plugins((

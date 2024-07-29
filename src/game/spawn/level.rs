@@ -19,5 +19,5 @@ fn spawn_level(_trigger: Trigger<SpawnLevel>, mut commands: Commands) {
     // commands.trigger(SpawnPlayer);
 
     commands.trigger(SpawnAtomScene);
-    commands.trigger(SpawnLevelUi)
+    commands.trigger(SpawnLevelUi);
 }

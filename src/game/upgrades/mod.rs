@@ -1,211 +1,200 @@
-mod upgrade_types;
+pub mod costs;
 
 use super::{cycles::CycleCount, movement::Revolve};
-use crate::game::spawn::atom::{add_electron, add_ring, Atom, Electron, Ring};
-use crate::game::ui::upgrades::{GlobalUpgradeIndex, UpgradeEntity};
-use crate::game::upgrades::upgrade_types::RecurringUpgrade;
-use bevy::prelude::*;
-
 use crate::game::assets::{HandleMap, ImageKey};
-pub use upgrade_types::Upgrade;
+use crate::game::spawn::atom::{AddProton, AddProtonNeutron, Atom, Electron, ElectronBundle, Ring};
+use bevy::prelude::*;
+use bevy::sprite::{MaterialMesh2dBundle, Mesh2dHandle};
 
 pub(super) fn plugin(app: &mut App) {
-    app.add_systems(Startup, add_global_upgrades);
-    app.add_systems(Update, (apply_upgrade, apply_global_upgrade));
+    app.add_systems(
+        Update,
+        (
+            apply_electron_upgrade,
+            apply_cycle_upgrade,
+            apply_speed_upgrade,
+            apply_buy_ring,
+        ),
+    );
 }
 
-fn add_global_upgrades(mut commands: Commands) {
-    commands.insert_resource(Upgrades::global());
-}
+#[derive(Component)]
+pub struct BuyNextRing;
+#[derive(Component)]
+pub struct BuyElectron(pub Entity);
+#[derive(Component)]
+pub struct SpeedUpgrade(pub Entity);
+#[derive(Component)]
+pub struct CycleUpgrade(pub Entity);
 
-#[derive(Debug, Clone)]
-pub enum UpgradeAction {
-    SpeedAdd(f32),
-    SpeedMult(f32),
-    Electron,
-    Ring,
-}
+const MAX_RINGS: usize = 5;
 
-impl std::fmt::Display for UpgradeAction {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            UpgradeAction::SpeedAdd(v) => write!(f, "Speed +{}", v),
-            UpgradeAction::SpeedMult(v) => write!(f, "Speed x{}", v),
-            UpgradeAction::Electron => write!(f, ""),
-            UpgradeAction::Ring => write!(f, ""),
-        }
-    }
-}
-
-#[derive(Component, Resource)]
-pub struct Upgrades(pub Vec<Box<dyn Upgrade + Send + Sync>>);
-
-impl Upgrades {
-    pub fn global() -> Self {
-        Self(vec![
-            Box::new(RecurringUpgrade::new(
-                "New Electron",
-                None,
-                1 + 8 + 8 + 2,
-                UpgradeAction::Electron,
-                |count| 5 * (count as u32 + 1),
-            )),
-            Box::new(RecurringUpgrade::new(
-                "New Ring",
-                None,
-                4,
-                UpgradeAction::Ring,
-                |count| 25 + (10 * count as u32),
-            )),
-        ])
-    }
-    pub fn electron() -> Self {
-        Self(vec![
-            Box::new(RecurringUpgrade::new(
-                "Speed",
-                None,
-                10,
-                UpgradeAction::SpeedAdd(1.0),
-                |count| 2 * count as u32,
-            )),
-            Box::new(RecurringUpgrade::new(
-                "Multiply Speed",
-                None,
-                10,
-                UpgradeAction::SpeedMult(1.2),
-                |count| 3 * count as u32,
-            )),
-        ])
-    }
-}
-
-// }
-//     None => log::info!("No more upgrades"),
-//     Some(upgrade_type) => process(upgrade_type),
-fn process_upgrade(
-    upgrade: &mut dyn Upgrade,
-    cycle_count: &mut CycleCount,
-    process: impl FnOnce(&UpgradeAction) -> bool,
-) {
-    log::info!("Pressed upgrade: {}", upgrade.name());
-    if upgrade.purchased() {
-        log::info!("Upgrade already purchased");
-        return;
-    }
-    let Some(cost) = upgrade.next_cost() else {
-        return;
-    };
-    let can_purchase = cycle_count.0 >= cost;
-
-    if !can_purchase {
-        log::info!("Cannot purchase upgrade: not enough cycles");
-        return;
-    }
-
-    let upgrade_type = upgrade.upgrade_action().unwrap();
-
-    let success = process(upgrade_type);
-    if !success {
-        log::error!("Failed to apply upgrade");
-        return;
-    }
-
-    if let Err(e) = upgrade.purchase() {
-        log::error!("Failed to purchase upgrade: {e}");
-        return;
-    }
-    cycle_count.0 -= cost;
-
-    log::info!("Purchased upgrade: {}", upgrade.name());
-}
-
-fn apply_global_upgrade(
-    mut commands: Commands,
-    q_interaction: Query<(&Interaction, &GlobalUpgradeIndex), Changed<Interaction>>,
-    mut upgrades: ResMut<Upgrades>,
-    mut query_revolve: Query<&mut Revolve>,
+pub const INITIAL_REVOLVE_SPEED: f32 = 3.0;
+fn apply_buy_ring(
+    q_interaction: Query<(Entity, &Interaction), (With<BuyNextRing>, Changed<Interaction>)>,
     mut cycle_count: ResMut<CycleCount>,
-    image_handles: Res<HandleMap<ImageKey>>,
-    query_ring: Query<(Entity, Option<&Children>, &Ring)>,
-    query_electrons: Query<(&Parent, &Electron)>,
-
-    query_atom: Query<(Entity, &Children), With<Atom>>,
+    mut commands: Commands,
+    query_atom: Query<(Entity, Option<&Children>), With<Atom>>,
     query_rings: Query<&Ring>,
+
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<ColorMaterial>>,
 ) {
-    for (interaction, index) in q_interaction.iter() {
+    for (entity, interaction) in &q_interaction {
         if interaction != &Interaction::Pressed {
             continue;
         }
+        let (atom, maybe_children) = query_atom.get_single().unwrap();
+        let ring_count = maybe_children
+            .map(|children| {
+                children
+                    .iter()
+                    .filter(|child| query_rings.get(**child).is_ok())
+                    .count()
+            })
+            .unwrap_or_default();
 
-        let Some(upgrade) = upgrades.0.get_mut(index.0) else {
+        if ring_count + 1 == MAX_RINGS {
+            log::info!("Last Ring purchased");
+            commands.entity(entity).despawn_recursive();
+        }
+
+        let cost = costs::compute_ring_cost(ring_count);
+        if cost > cycle_count.0 {
+            log::info!("Cannot afford ring: not enough cycles");
             continue;
-        };
-        process_upgrade(
-            upgrade.as_mut(),
-            cycle_count.as_mut(),
-            |upgrade_type| match upgrade_type {
-                UpgradeAction::SpeedAdd(speed) => {
-                    for mut r in &mut query_revolve {
-                        r.speed += speed;
-                    }
-                    true
-                }
-                UpgradeAction::SpeedMult(mult) => {
-                    for mut r in &mut query_revolve {
-                        r.multiplier = *mult;
-                    }
-                    true
-                }
-                UpgradeAction::Electron => add_electron(
-                    &mut commands,
-                    image_handles.as_ref(),
-                    &query_ring,
-                    &query_electrons,
-                ),
-                UpgradeAction::Ring => add_ring(
-                    &mut commands,
-                    &query_atom,
-                    &query_rings,
-                    meshes.as_mut(),
-                    materials.as_mut(),
-                ),
-            },
-        );
+        }
+
+        cycle_count.0 -= cost;
+
+        let ring = Ring::new(ring_count);
+        let ring_radius = ring.radius();
+        commands.entity(atom).with_children(|parent| {
+            parent.spawn((
+                ring,
+                MaterialMesh2dBundle {
+                    mesh: Mesh2dHandle(meshes.add(Circle::new(ring_radius))),
+                    material: materials.add(Color::srgba_u8(0x28, 0x66, 0x6e, 0x66)),
+                    transform: Transform::from_xyz(0., 0., -100.),
+                    ..default()
+                },
+                Revolve::new(INITIAL_REVOLVE_SPEED),
+            ));
+        });
     }
 }
-fn apply_upgrade(
-    q_interaction: Query<(&Interaction, &UpgradeEntity), Changed<Interaction>>,
-    mut q_electron: Query<(&mut Upgrades, &mut Revolve)>,
 
+fn apply_speed_upgrade(
+    q_interaction: Query<(&Interaction, &SpeedUpgrade), Changed<Interaction>>,
     mut cycle_count: ResMut<CycleCount>,
+
+    mut query_ring: Query<&mut Revolve>,
 ) {
-    for (interaction, index) in q_interaction.iter() {
+    for (interaction, entity) in &q_interaction {
         if interaction != &Interaction::Pressed {
             continue;
         }
 
-        let Ok((mut upgrades, mut revolve)) = q_electron.get_mut(index.entity) else {
+        let Ok(mut ring) = query_ring.get_mut(entity.0) else {
             continue;
         };
-        let Some(upgrade) = upgrades.0.get_mut(index.index) else {
+
+        let cost = costs::compute_speed_cost(ring.speed);
+        if cost > cycle_count.0 {
+            log::info!("Cannot afford speed upgrade: not enough cycles");
+            continue;
+        }
+
+        ring.speed += 1.0;
+        cycle_count.0 -= cost;
+    }
+}
+
+fn apply_cycle_upgrade(
+    q_interaction: Query<(&Interaction, &CycleUpgrade), Changed<Interaction>>,
+    mut cycle_count: ResMut<CycleCount>,
+
+    mut query_ring: Query<&mut Ring>,
+) {
+    for (interaction, entity) in &q_interaction {
+        if interaction != &Interaction::Pressed {
+            continue;
+        }
+
+        let Ok(mut ring) = query_ring.get_mut(entity.0) else {
             continue;
         };
-        process_upgrade(
-            upgrade.as_mut(),
-            cycle_count.as_mut(),
-            |upgrade_type| match upgrade_type {
-                UpgradeAction::SpeedAdd(speed) => {
-                    revolve.speed += speed;
-                    true
+
+        let cost = costs::compute_ring_cost(ring.index);
+        if cost > cycle_count.0 {
+            log::info!("Cannot afford cycle speed upgrade: not enough cycles");
+            continue;
+        }
+
+        if let Some(timer) = ring.cycle_timer.as_mut() {
+            timer.set_duration(timer.duration() / 2);
+        } else {
+            ring.cycle_timer = Some(Timer::from_seconds(5., TimerMode::Repeating));
+        }
+
+        cycle_count.0 -= cost;
+    }
+}
+fn apply_electron_upgrade(
+    mut commands: Commands,
+    q_interaction: Query<(&Interaction, &BuyElectron), Changed<Interaction>>,
+    mut cycle_count: ResMut<CycleCount>,
+
+    image_handles: Res<HandleMap<ImageKey>>,
+    query_ring: Query<(Entity, Option<&Children>, &Ring)>,
+    query_electrons: Query<(&Parent, &Electron)>,
+) {
+    for (interaction, entity) in &q_interaction {
+        if interaction != &Interaction::Pressed {
+            continue;
+        }
+
+        let Ok((parent, maybe_children, ring)) = query_ring.get(entity.0) else {
+            continue;
+        };
+
+        let mut electron_count = 0;
+        if let Some(children) = maybe_children {
+            for child in children {
+                if query_electrons.get(*child).is_ok() {
+                    electron_count += 1;
                 }
-                UpgradeAction::SpeedMult(mult) => {
-                    revolve.multiplier = *mult;
-                    true
-                }
-                UpgradeAction::Electron | UpgradeAction::Ring => false,
-            },
-        );
+            }
+        }
+
+        if electron_count >= ring.max_electrons {
+            log::info!("Ring {} is full", ring.index);
+            continue;
+        }
+
+        let cost = costs::compute_electron_cost(ring.index, electron_count);
+        if cost > cycle_count.0 {
+            log::info!("Cannot afford electron: not enough cycles");
+            continue;
+        }
+
+        commands.entity(parent).with_children(|parent| {
+            parent.spawn(ElectronBundle::new(
+                ring.index,
+                electron_count,
+                ring.radius(),
+                image_handles.as_ref(),
+            ));
+        });
+
+        if ring.index == 0 && electron_count == 0 {
+            commands.trigger(AddProton);
+        } else {
+            commands.trigger(AddProtonNeutron);
+        }
+
+        cycle_count.0 -= cost;
+
+        //success sub money
     }
 }

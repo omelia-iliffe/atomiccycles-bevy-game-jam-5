@@ -115,14 +115,18 @@ impl RevolutionController {
 fn apply_revolve(
     time: Res<Time>,
     mut movement_query: Query<(
-        &Revolve,
+        &Parent,
         &mut RevolutionController,
         &mut Transform,
         &BaseTransform,
     )>,
+    query_parent: Query<&Revolve>,
     mut commands: Commands,
 ) {
-    for (revolve, mut count, mut transform, base) in &mut movement_query {
+    for (parent, mut count, mut transform, base) in &mut movement_query {
+        let Ok(revolve) = query_parent.get(parent.get()) else {
+            continue;
+        };
         if count.count > 0 {
             count.angle += revolve.speed() * time.delta_seconds();
             if count.angle > 2.0 * PI {

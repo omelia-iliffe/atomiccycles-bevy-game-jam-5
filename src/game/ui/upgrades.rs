@@ -1,3 +1,12 @@
+use crate::game::movement::Revolve;
+use crate::game::spawn::atom::{Electron, Ring};
+use crate::game::upgrades::costs::{
+    compute_cycle_cost, compute_electron_cost, compute_ring_cost, compute_speed_cost,
+};
+use crate::game::upgrades::BuyNextRing;
+use crate::game::upgrades::{BuyElectron, CycleUpgrade, SpeedUpgrade, INITIAL_REVOLVE_SPEED};
+use crate::screen::Screen;
+use crate::ui::{interaction::InteractionPalette, palette::*};
 use bevy::{
     a11y::{
         accesskit::{NodeBuilder, Role},
@@ -7,15 +16,17 @@ use bevy::{
     prelude::*,
 };
 
-use crate::game::upgrades::Upgrade;
-use crate::game::upgrades::Upgrades;
-use crate::screen::Screen;
-use crate::ui::{interaction::InteractionPalette, palette::*};
-
 pub(super) fn plugin(app: &mut App) {
     app.observe(spawn_upgrades_ui).add_systems(
         Update,
-        (add_new_upgrades, update_upgrade_text, mouse_scroll).chain(),
+        (
+            add_new_upgrades,
+            update_cycle_upgrades,
+            update_electron_upgrades,
+            update_speed_upgrades,
+            mouse_scroll,
+        )
+            .chain(),
     );
 
     #[cfg(feature = "dev")]
@@ -32,15 +43,6 @@ pub struct SpawnUpgradesUi;
 pub struct UpgradeList;
 
 #[derive(Component)]
-pub(crate) struct GlobalUpgradeIndex(pub(crate) usize);
-
-#[derive(Component)]
-pub(crate) struct UpgradeEntity {
-    pub entity: Entity,
-    pub index: usize,
-}
-
-#[derive(Component)]
 struct UpgradeText;
 
 #[derive(Bundle)]
@@ -50,29 +52,20 @@ struct UpgradeButtonBundle {
 }
 
 impl UpgradeButtonBundle {
-    pub fn new() -> Self {
+    pub fn new(width: f32) -> Self {
         Self {
             button_bundle: ButtonBundle {
                 style: Style {
                     flex_direction: FlexDirection::Column,
-                    align_items: AlignItems::FlexStart,
-                    margin: UiRect {
-                        bottom: Val::Percent(2.),
-                        ..default()
-                    },
+                    align_items: AlignItems::Center,
                     padding: UiRect {
-                        left: Val::Px(10.),
-                        right: Val::Px(10.),
-                        top: Val::Px(10.),
-                        bottom: Val::Px(10.),
+                        left: Val::Px(4.),
+                        right: Val::Px(4.),
+                        top: Val::Px(5.),
+                        bottom: Val::Px(5.),
                     },
-                    border: UiRect {
-                        left: Val::Px(1.),
-                        right: Val::Px(1.),
-                        top: Val::Px(1.),
-                        bottom: Val::Px(1.),
-                    },
-                    width: Val::Percent(100.),
+                    width: Val::Percent(width),
+                    height: Val::Percent(100.),
                     ..default()
                 },
                 background_color: BackgroundColor(NODE_BACKGROUND),
@@ -95,58 +88,7 @@ struct UpgradeTextBundle {
     accessibility_node: AccessibilityNode,
 }
 
-impl UpgradeTextBundle {
-    pub fn new(upgrade: &dyn Upgrade) -> Self {
-        Self {
-            text_bundle: TextBundle::from_sections([
-                TextSection::new(format!("{}\n", upgrade.name()), TextStyle::default()),
-                TextSection::new(
-                    format!("{}\n", upgrade.description()),
-                    TextStyle {
-                        font_size: 18.,
-                        ..default()
-                    },
-                ),
-                TextSection::new(upgrade.cost(), TextStyle::default()),
-            ]),
-            upgrade_text: UpgradeText,
-            label: Label,
-            accessibility_node: AccessibilityNode(NodeBuilder::new(Role::ListItem)),
-        }
-    }
-}
-
-fn add_upgrade_list(parent: &mut ChildBuilder, entity: Entity, name: &Name, upgrades: &Upgrades) {
-    // Container
-    parent
-        .spawn(NodeBundle {
-            style: Style {
-                flex_direction: FlexDirection::Column,
-                align_items: AlignItems::Center,
-                width: Val::Percent(100.),
-                ..default()
-            },
-            ..default()
-        })
-        .with_children(|parent| {
-            // Header
-            parent.spawn(TextBundle::from_section(name, TextStyle::default()));
-            for (index, u) in upgrades.0.iter().enumerate() {
-                // upgrade
-                parent
-                    .spawn((UpgradeButtonBundle::new(), UpgradeEntity { entity, index }))
-                    .with_children(|parent| {
-                        parent.spawn(UpgradeTextBundle::new(u.as_ref()));
-                    });
-            }
-        });
-}
-
-fn spawn_upgrades_ui(
-    _trigger: Trigger<SpawnUpgradesUi>,
-    mut commands: Commands,
-    global_upgrades: Res<Upgrades>,
-) {
+fn spawn_upgrades_ui(_trigger: Trigger<SpawnUpgradesUi>, mut commands: Commands) {
     // root node
     commands
         .spawn((
@@ -155,7 +97,7 @@ fn spawn_upgrades_ui(
                     flex_direction: FlexDirection::Column,
                     justify_content: JustifyContent::Center,
                     align_items: AlignItems::Center,
-                    width: Val::Px(300.),
+                    width: Val::Px(400.),
                     height: Val::Percent(95.),
                     ..default()
                 },
@@ -204,15 +146,54 @@ fn spawn_upgrades_ui(
                             AccessibilityNode(NodeBuilder::new(Role::List)),
                         ))
                         .with_children(|parent| {
-                            // List items
-                            for (index, u) in global_upgrades.0.iter().enumerate() {
-                                parent
-                                    .spawn((UpgradeButtonBundle::new(), GlobalUpgradeIndex(index)))
-                                    .with_children(|parent| {
-                                        parent.spawn(UpgradeTextBundle::new(u.as_ref()));
-                                    });
-                            }
-                            // non global upgrades now spawn on Add<Upgrades>
+                            //     // List items
+                            //     // TODO: Add ring one here
+                            parent
+                                .spawn((NodeBundle {
+                                    style: Style {
+                                        flex_direction: FlexDirection::Column,
+                                        align_items: AlignItems::Center,
+                                        width: Val::Percent(100.),
+                                        ..default()
+                                    },
+                                    ..default()
+                                },))
+                                .with_children(|parent| {
+                                    let cost = compute_ring_cost(0);
+                                    parent
+                                        .spawn((UpgradeButtonBundle::new(100.), BuyNextRing))
+                                        .with_children(|parent| {
+                                            parent.spawn((
+                                                TextBundle::from_sections([
+                                                    TextSection::new(
+                                                        "Buy Ring",
+                                                        TextStyle {
+                                                            font_size: 18.,
+                                                            ..default()
+                                                        },
+                                                    ),
+                                                    TextSection::new(
+                                                        "\nCost: ",
+                                                        TextStyle {
+                                                            font_size: 18.,
+                                                            ..default()
+                                                        },
+                                                    ),
+                                                    TextSection::new(
+                                                        cost.to_string(),
+                                                        TextStyle {
+                                                            font_size: 18.,
+                                                            ..default()
+                                                        },
+                                                    ),
+                                                ])
+                                                .with_text_justify(JustifyText::Center),
+                                                UpgradeText,
+                                                Label,
+                                                AccessibilityNode(NodeBuilder::new(Role::ListItem)),
+                                            ));
+                                        });
+                                });
                         });
                 });
         });
@@ -220,47 +201,279 @@ fn spawn_upgrades_ui(
 
 fn add_new_upgrades(
     mut commands: Commands,
-    upgrade_list: Query<(Entity, &UpgradeList)>,
-    upgrades: Query<(Entity, &Name, &Upgrades), Added<Upgrades>>,
+    query_list: Query<Entity, With<UpgradeList>>,
+    query_ring: Query<(Entity, &Ring), Added<Ring>>,
 ) {
-    let Ok((parent, _)) = upgrade_list.get_single() else {
+    let Ok(parent) = query_list.get_single() else {
         return;
     };
-    for (entity, name, upgrades) in &upgrades {
+    for (entity, ring) in &query_ring {
         commands.entity(parent).with_children(|parent| {
-            add_upgrade_list(parent, entity, name, upgrades);
+            let title = format!("Ring {}", ring.index + 1);
+            parent
+                .spawn((
+                    Name::new(title.clone()),
+                    NodeBundle {
+                        style: Style {
+                            flex_direction: FlexDirection::Column,
+                            align_items: AlignItems::Center,
+                            width: Val::Percent(100.),
+                            ..default()
+                        },
+                        ..default()
+                    },
+                ))
+                .with_children(|parent| {
+                    // Header
+                    parent.spawn(TextBundle {
+                        text: Text::from_section(title, TextStyle::default()),
+                        style: Style {
+                            width: Val::Percent(100.),
+                            ..default()
+                        },
+                        ..Default::default()
+                    });
+                    parent
+                        .spawn(NodeBundle {
+                            style: Style {
+                                flex_direction: FlexDirection::Row,
+                                align_items: AlignItems::Center,
+                                width: Val::Percent(100.),
+                                ..default()
+                            },
+                            ..default()
+                        })
+                        .with_children(|parent| {
+                            // Buy electron
+                            let electron_cost = compute_electron_cost(ring.index, 0);
+                            parent
+                                .spawn((UpgradeButtonBundle::new(38.), BuyElectron(entity)))
+                                .with_children(|parent| {
+                                    parent.spawn((
+                                        TextBundle::from_sections([
+                                            TextSection::new(
+                                                "Electrons\n",
+                                                TextStyle {
+                                                    font_size: 18.,
+
+                                                    ..default()
+                                                },
+                                            ),
+                                            TextSection::new("2", TextStyle::default()),
+                                            TextSection::new(
+                                                "\nCost: ",
+                                                TextStyle {
+                                                    font_size: 18.,
+                                                    ..default()
+                                                },
+                                            ),
+                                            TextSection::new(
+                                                electron_cost.to_string(),
+                                                TextStyle {
+                                                    font_size: 18.,
+                                                    ..default()
+                                                },
+                                            ),
+                                        ])
+                                        .with_text_justify(JustifyText::Center),
+                                        UpgradeText,
+                                        Label,
+                                        AccessibilityNode(NodeBuilder::new(Role::ListItem)),
+                                    ));
+                                });
+                            // SPEED upgrade
+                            let speed_cost = compute_speed_cost(INITIAL_REVOLVE_SPEED);
+                            parent
+                                .spawn((UpgradeButtonBundle::new(30.), SpeedUpgrade(entity)))
+                                .with_children(|parent| {
+                                    parent.spawn((
+                                        TextBundle::from_sections([
+                                            TextSection::new(
+                                                "Speed\n",
+                                                TextStyle {
+                                                    font_size: 18.,
+                                                    ..default()
+                                                },
+                                            ),
+                                            TextSection::new("2", TextStyle::default()),
+                                            TextSection::new(
+                                                "\nCost: ",
+                                                TextStyle {
+                                                    font_size: 18.,
+                                                    ..default()
+                                                },
+                                            ),
+                                            TextSection::new(
+                                                format!("{:.2}", speed_cost),
+                                                TextStyle {
+                                                    font_size: 18.,
+                                                    ..default()
+                                                },
+                                            ),
+                                        ])
+                                        .with_text_justify(JustifyText::Center),
+                                        UpgradeText,
+                                        Label,
+                                        AccessibilityNode(NodeBuilder::new(Role::ListItem)),
+                                    ));
+                                });
+                            // CYCLE
+                            let cycle_cost = compute_cycle_cost(None);
+                            parent
+                                .spawn((UpgradeButtonBundle::new(30.), CycleUpgrade(entity)))
+                                .with_children(|parent| {
+                                    parent.spawn((
+                                        TextBundle::from_sections([
+                                            TextSection::new(
+                                                "Cycles\n",
+                                                TextStyle {
+                                                    font_size: 18.,
+                                                    ..default()
+                                                },
+                                            ),
+                                            TextSection::new("".to_string(), TextStyle::default()),
+                                            TextSection::new(
+                                                "s",
+                                                TextStyle {
+                                                    font_size: 18.,
+                                                    ..default()
+                                                },
+                                            ),
+                                            TextSection::new(
+                                                "\nCost: ",
+                                                TextStyle {
+                                                    font_size: 18.,
+                                                    ..default()
+                                                },
+                                            ),
+                                            TextSection::new(
+                                                cycle_cost.to_string(),
+                                                TextStyle {
+                                                    font_size: 18.,
+                                                    ..default()
+                                                },
+                                            ),
+                                        ])
+                                        .with_text_justify(JustifyText::Center),
+                                        UpgradeText,
+                                        Label,
+                                        AccessibilityNode(NodeBuilder::new(Role::ListItem)),
+                                    ));
+                                });
+                            parent.spawn(NodeBundle {
+                                style: Style {
+                                    flex_direction: FlexDirection::Column,
+                                    align_items: AlignItems::Center,
+                                    width: Val::Percent(2.),
+                                    height: Val::Percent(100.),
+                                    ..default()
+                                },
+                                background_color: BackgroundColor(BUTTON_HOVERED_BACKGROUND),
+                                ..default()
+                            });
+                        });
+                });
         });
     }
 }
 
-fn update_upgrade_text(
-    query_upgrades: Query<&Upgrades, Changed<Upgrades>>,
-    global_upgrades: Res<Upgrades>,
-    mut query_text: Query<(&Parent, &mut Text, &UpgradeText)>,
-    query_parent_global: Query<&GlobalUpgradeIndex>,
-    query_parent: Query<&UpgradeEntity>,
+fn update_speed_upgrades(
+    query_ring: Query<(Entity, &Revolve), Changed<Revolve>>,
+    query_upgrade: Query<(&SpeedUpgrade, &Children)>,
+    mut query_upgrade_text: Query<&mut Text, With<UpgradeText>>,
 ) {
-    for (parent, mut text, _) in query_text.iter_mut() {
-        let upgrade = if let Ok(index) = query_parent_global.get(parent.get()) {
-            if !global_upgrades.is_changed() {
-                continue;
-            }
-            global_upgrades.0.get(index.0)
-        } else if let Ok(index) = query_parent.get(parent.get()) {
-            query_upgrades
-                .get(index.entity)
-                .ok()
-                .and_then(|upgrades| upgrades.0.get(index.index))
-        } else {
+    for (entity, revolve) in &query_ring {
+        let cost = compute_speed_cost(revolve.speed());
+
+        let Some(upgrade_entity) = query_upgrade
+            .iter()
+            .find(|(upgrade, _)| upgrade.0 == entity)
+            .map(|(_, children)| children[0])
+        else {
             continue;
         };
 
-        let Some(upgrade) = upgrade else {
+        let Ok(mut text) = query_upgrade_text.get_mut(upgrade_entity) else {
             continue;
         };
-        text.sections[0].value = format!("{}\n", upgrade.name());
-        text.sections[1].value = format!("{}\n", upgrade.description());
-        text.sections[2].value = upgrade.cost();
+
+        text.sections[1].value = format!("{:.2}", revolve.speed());
+        text.sections[3].value = format!("{}", cost);
+        log::info!("Speed: {}, Cost: {}", revolve.speed(), cost);
+    }
+}
+
+fn update_cycle_upgrades(
+    query_ring: Query<(Entity, &Ring), Changed<Ring>>,
+    query_upgrade: Query<(&CycleUpgrade, &Children)>,
+    mut query_upgrade_text: Query<&mut Text, With<UpgradeText>>,
+) {
+    for (entity, ring) in &query_ring {
+        let duration = ring.cycle_timer.as_ref().map(|t| t.duration());
+        let cost = compute_cycle_cost(duration);
+
+        let Some(upgrade_entity) = query_upgrade
+            .iter()
+            .find(|(upgrade, _)| upgrade.0 == entity)
+            .map(|(_, children)| children[0])
+        else {
+            continue;
+        };
+
+        let Ok(mut text) = query_upgrade_text.get_mut(upgrade_entity) else {
+            continue;
+        };
+
+        text.sections[1].value = match duration {
+            Some(duration) => {
+                format!("{:.2}", duration.as_secs_f32())
+            }
+            None => "".to_string(),
+        };
+
+        text.sections[4].value = format!("{}", cost);
+    }
+}
+
+fn update_electron_upgrades(
+    query_added_electron: Query<&Parent, Added<Electron>>,
+    query_electrons: Query<Entity, With<Electron>>,
+    query_ring: Query<(&Ring, Option<&Children>)>,
+    query_upgrade: Query<(&BuyElectron, &Children)>,
+    mut query_upgrade_text: Query<&mut Text, With<UpgradeText>>,
+) {
+    for added_electron_parent in &query_added_electron {
+        let Ok((ring, children)) = query_ring.get(added_electron_parent.get()) else {
+            continue;
+        };
+
+        let electron_count = {
+            children
+                .map(|children| {
+                    children
+                        .iter()
+                        .filter_map(|child| query_electrons.get(*child).ok())
+                        .count()
+                })
+                .unwrap_or_default()
+        };
+
+        let cost = compute_electron_cost(ring.index, electron_count);
+
+        let Some(upgrade_entity) = query_upgrade
+            .iter()
+            .find(|(upgrade, _)| upgrade.0 == added_electron_parent.get())
+            .map(|(_, children)| children[0])
+        else {
+            continue;
+        };
+
+        let Ok(mut text) = query_upgrade_text.get_mut(upgrade_entity) else {
+            continue;
+        };
+
+        text.sections[1].value = format!("{}", electron_count);
+        text.sections[3].value = format!("{}", cost);
     }
 }
 

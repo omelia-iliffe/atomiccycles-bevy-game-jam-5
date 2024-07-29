@@ -2,21 +2,19 @@
 
 use crate::game::assets::{HandleMap, ImageKey};
 use crate::game::movement::BaseTransform;
-use crate::game::upgrades::Upgrades;
 use crate::{
-    game::movement::{MovementController, RevolutionController, Revolve},
+    game::movement::{MovementController, RevolutionController},
     screen::Screen,
 };
-use bevy::{
-    prelude::*,
-    sprite::{MaterialMesh2dBundle, Mesh2dHandle},
-};
+use bevy::prelude::*;
 use bevy_mod_picking::prelude::*;
 use rand::random;
 
 pub(super) fn plugin(app: &mut App) {
-    app.observe(spawn_atom_scene);
-    app.observe(add_proton_neutron);
+    app.observe(spawn_atom_scene)
+        .observe(add_proton)
+        .observe(add_proton_neutron)
+        .add_systems(Update, cycle_rings);
 }
 
 #[derive(Event, Debug)]
@@ -29,6 +27,7 @@ pub struct Atom;
 pub struct Ring {
     pub index: usize,
     pub max_electrons: usize,
+    pub cycle_timer: Option<Timer>,
 }
 
 impl Ring {
@@ -37,6 +36,7 @@ impl Ring {
         Self {
             index,
             max_electrons,
+            cycle_timer: None,
         }
     }
     pub fn radius(&self) -> f32 {
@@ -67,14 +67,12 @@ pub struct ElectronBundle {
     sprite: SpriteBundle,
     base_transform: BaseTransform,
     movement_controller: MovementController,
-    revolve: Revolve,
     revolution_controller: RevolutionController,
-    upgrades: Upgrades,
     pickable_bundle: PickableBundle,
     on_click: On<Pointer<Click>>,
 }
 impl ElectronBundle {
-    fn new(
+    pub(crate) fn new(
         ring_index: usize,
         index: usize,
         radius: f32,
@@ -99,10 +97,8 @@ impl ElectronBundle {
             },
             base_transform,
             movement_controller: MovementController::new(),
-            revolve: Revolve::new(3.0),
             revolution_controller: RevolutionController::new(1, 350_f32.to_radians()),
             pickable_bundle: PickableBundle::default(), // <- Makes the mesh pickable.
-            upgrades: Upgrades::electron(),
             on_click: On::<Pointer<Click>>::target_component_mut::<MovementController>(
                 |_click, controller| {
                     controller.add_count = true;
@@ -112,133 +108,43 @@ impl ElectronBundle {
     }
 }
 
-fn spawn_atom_scene(
-    _trigger: Trigger<SpawnAtomScene>,
-    mut commands: Commands,
-    image_handles: Res<HandleMap<ImageKey>>,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<ColorMaterial>>,
-) {
-    commands
-        .spawn((
-            Atom,
-            TransformBundle::default(),
-            InheritedVisibility::default(),
-            StateScoped(Screen::Playing),
-        ))
-        .with_children(|parent| {
-            // Spawn Proton
-            parent.spawn((
-                Proton,
-                InNucleus,
-                SpriteBundle {
-                    texture: image_handles[&ImageKey::Proton].clone_weak(),
-                    ..Default::default()
-                },
-            ));
-            // Spawn First Ring
-            let ring = Ring::new(0);
-            let ring_radius = ring.radius();
-            let ring_index = ring.index;
-            parent
-                .spawn((
-                    ring,
-                    MaterialMesh2dBundle {
-                        mesh: Mesh2dHandle(meshes.add(Circle::new(ring_radius))),
-                        material: materials.add(Color::srgba_u8(0x28, 0x66, 0x6e, 0x66)),
-                        transform: Transform::from_xyz(0., 0., -100.),
-                        ..default()
-                    },
-                ))
-                .with_children(|parent| {
-                    parent.spawn(ElectronBundle::new(
-                        ring_index,
-                        0,
-                        ring_radius,
-                        image_handles.as_ref(),
-                    ));
-                });
-        });
+fn spawn_atom_scene(_trigger: Trigger<SpawnAtomScene>, mut commands: Commands) {
+    commands.spawn((
+        Atom,
+        TransformBundle::default(),
+        InheritedVisibility::default(),
+        StateScoped(Screen::Playing),
+    ));
 }
 
-pub fn add_ring(
-    commands: &mut Commands,
-    query_atom: &Query<(Entity, &Children), With<Atom>>,
-    query_rings: &Query<&Ring>,
-    meshes: &mut Assets<Mesh>,
-    materials: &mut Assets<ColorMaterial>,
-) -> bool {
-    let (atom, children) = query_atom.get_single().unwrap();
-    let ring_count = children
-        .iter()
-        .filter(|child| query_rings.get(**child).is_ok())
-        .count();
+#[derive(Event)]
+pub struct AddProton;
 
-    let ring = Ring::new(ring_count);
-    let ring_radius = ring.radius();
+fn add_proton(
+    _trigger: Trigger<AddProtonNeutron>,
+    mut commands: Commands,
+    query_atom: Query<Entity, With<Atom>>,
+    image_handles: Res<HandleMap<ImageKey>>,
+) {
+    let Ok(atom) = query_atom.get_single() else {
+        return;
+    };
     commands.entity(atom).with_children(|parent| {
         parent.spawn((
-            ring,
-            MaterialMesh2dBundle {
-                mesh: Mesh2dHandle(meshes.add(Circle::new(ring_radius))),
-                material: materials.add(Color::srgba_u8(0x28, 0x66, 0x6e, 0x66)),
-                transform: Transform::from_xyz(0., 0., -100.),
-                ..default()
+            Proton,
+            InNucleus,
+            SpriteBundle {
+                texture: image_handles[&ImageKey::Proton].clone_weak(),
+                transform: Transform::from_xyz(
+                    (random::<f32>() * 2.) - 1.,
+                    (random::<f32>() * 2.) - 1.,
+                    0.,
+                ),
+                ..Default::default()
             },
         ));
     });
-
-    true
 }
-
-pub fn add_electron(
-    commands: &mut Commands,
-    image_handles: &HandleMap<ImageKey>,
-    query: &Query<(Entity, Option<&Children>, &Ring)>,
-    query_electrons: &Query<(&Parent, &Electron)>,
-) -> bool {
-    let rings = query
-        .iter()
-        .sort_by_key::<&Ring, _>(|ring| ring.index)
-        .collect::<Vec<_>>();
-
-    let Some((parent, ring, index)) =
-        rings
-            .into_iter()
-            .find_map(|(parent, maybe_children, ring)| {
-                let mut electron_count = 0;
-                if let Some(children) = maybe_children {
-                    for child in children {
-                        if query_electrons.get(*child).is_ok() {
-                            electron_count += 1;
-                        }
-                    }
-                }
-                if electron_count < ring.max_electrons {
-                    Some((parent, ring, electron_count))
-                } else {
-                    log::info!("Ring {} is full", ring.index);
-                    None
-                }
-            })
-    else {
-        return false;
-    };
-
-    commands.entity(parent).with_children(|parent| {
-        parent.spawn(ElectronBundle::new(
-            ring.index,
-            index,
-            ring.radius(),
-            image_handles,
-        ));
-    });
-
-    commands.trigger(AddProtonNeutron);
-
-    true
-}
-
 #[derive(Event)]
 pub struct AddProtonNeutron;
 
@@ -279,4 +185,23 @@ fn add_proton_neutron(
             },
         ));
     });
+}
+
+fn cycle_rings(
+    mut query_ring: Query<(&mut Ring, &Children)>,
+    mut query_electrons: Query<&mut RevolutionController, With<Electron>>,
+    time: Res<Time>,
+) {
+    for (mut ring, children) in &mut query_ring {
+        if let Some(timer) = ring.cycle_timer.as_mut() {
+            timer.tick(time.delta());
+            if timer.finished() {
+                for child in children.iter() {
+                    if let Ok(mut r) = query_electrons.get_mut(*child) {
+                        r.add_count();
+                    }
+                }
+            }
+        }
+    }
 }
